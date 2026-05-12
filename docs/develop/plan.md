@@ -12,11 +12,11 @@
 搭建项目骨架，完成基础配置与开发环境。
 
 ### 任务清单
-- [ ] 初始化项目目录结构（data / strategies / backtest / config 等）
-- [ ] 编写 `requirements.txt`，安装核心依赖（ccxt, pandas, numpy, ta-lib, backtesting, psycopg2）
-- [ ] 创建 `config/settings.yaml` 全局配置模板（交易所 API Key、数据库连接等）
-- [ ] 搭建日志模块（统一日志格式与级别管理）
-- [ ] 编写 `main.py` 程序入口，支持命令行参数
+- [x] 初始化项目目录结构（data / strategies / backtest / config 等）
+- [x] 编写 `pyproject.toml`，安装核心依赖（ccxt, pandas, numpy, ta, backtesting, psycopg2-binary, loguru, click）
+- [x] 创建 `config/settings.yaml` 全局配置模板（交易所 API Key、数据库连接等）
+- [x] 搭建日志模块（统一日志格式与级别管理）
+- [x] 编写 `main.py` 程序入口，支持命令行参数
 
 ---
 

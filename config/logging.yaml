@@ -1,0 +1,8 @@
+# 日志配置
+
+log:
+  level: INFO
+  format: "{time:YYYY-MM-DD HH:mm:ss} | {level:<8} | {name}:{function}:{line} | {message}"
+  rotation: "10 MB"
+  retention: "30 days"
+  path: logs/alpha_trade.log

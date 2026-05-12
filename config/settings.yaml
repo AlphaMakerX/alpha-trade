@@ -1,0 +1,48 @@
+# Alpha Trade 全局配置
+
+# 交易所 API 配置
+exchange:
+  name: binance
+  api_key: ${EXCHANGE_API_KEY}
+  secret: ${EXCHANGE_SECRET}
+  sandbox: true  # 是否使用沙盒环境
+
+# 交易对
+trading:
+  pair: ETH/USDT
+  timeframes:
+    - 1h
+    - 4h
+    - 1d
+  commission: 0.001    # 手续费率 0.1%
+  slippage: 0.0005     # 滑点 0.05%
+
+# 回测参数
+backtest:
+  initial_capital: 10000  # 初始资金 USDT
+  start_date: "2024-01-01"
+  end_date: "2025-01-01"
+
+# 数据库
+database:
+  host: localhost
+  port: 5432
+  name: alpha_trade
+  user: ${DB_USER}
+  password: ${DB_PASSWORD}
+
+# Redis
+redis:
+  host: localhost
+  port: 6379
+  db: 0
+
+# 数据粒度
+data:
+  timeframes:
+    - 1m
+    - 5m
+    - 15m
+    - 1h
+    - 4h
+    - 1d
