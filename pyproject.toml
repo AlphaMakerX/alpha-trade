@@ -26,9 +26,6 @@ dev = [
     "black>=23.0",
 ]
 
-[project.scripts]
-alpha-trade = "main:cli"
-
 [tool.setuptools.packages.find]
 include = ["data*", "strategies*", "indicators*", "engine*", "analysis*", "utils*"]
 

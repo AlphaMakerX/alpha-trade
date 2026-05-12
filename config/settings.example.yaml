@@ -10,18 +10,25 @@ exchange:
 # 交易对
 trading:
   pair: ETH/USDT
+  commission: 0.001    # 手续费率 0.1%
+  slippage: 0.0005     # 滑点 0.05%
+
+# 数据粒度
+data:
   timeframes:
+    - 1m
+    - 5m
+    - 15m
     - 1h
     - 4h
     - 1d
-  commission: 0.001    # 手续费率 0.1%
-  slippage: 0.0005     # 滑点 0.05%
 
 # 回测参数
 backtest:
   initial_capital: 10000  # 初始资金 USDT
   start_date: "2024-01-01"
   end_date: "2025-01-01"
+  timeframe: 1h  # 回测使用的K线周期
 
 # 数据库
 database:
@@ -36,13 +43,3 @@ redis:
   host: localhost
   port: 6379
   db: 0
-
-# 数据粒度
-data:
-  timeframes:
-    - 1m
-    - 5m
-    - 15m
-    - 1h
-    - 4h
-    - 1d

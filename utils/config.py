@@ -1,4 +1,5 @@
 import os
+import re
 from pathlib import Path
 
 import yaml
@@ -8,11 +9,13 @@ _CONFIG_DIR = _PROJECT_ROOT / "config"
 
 _settings_cache: dict | None = None
 
+_ENV_PATTERN = re.compile(r"\$\{([^}]+)\}")
+
 
 def _resolve_env_vars(obj):
-    """递归替换配置中的 ${ENV_VAR} 为环境变量值。"""
-    if isinstance(obj, str) and obj.startswith("${") and obj.endswith("}"):
-        return os.getenv(obj[2:-1], obj)
+    """递归替换配置中的 ${ENV_VAR} 为环境变量值，支持嵌入式变量。"""
+    if isinstance(obj, str) and "${" in obj:
+        return _ENV_PATTERN.sub(lambda m: os.getenv(m.group(1), m.group(0)), obj)
     if isinstance(obj, dict):
         return {k: _resolve_env_vars(v) for k, v in obj.items()}
     if isinstance(obj, list):
@@ -23,6 +26,10 @@ def _resolve_env_vars(obj):
 def load_yaml(filename: str) -> dict:
     """加载 config/ 目录下的 YAML 文件。"""
     path = _CONFIG_DIR / filename
+    if not path.exists():
+        example = path.with_suffix(".example.yaml")
+        if example.exists():
+            path = example
     with open(path, "r", encoding="utf-8") as f:
         data = yaml.safe_load(f)
     return _resolve_env_vars(data) if data else {}

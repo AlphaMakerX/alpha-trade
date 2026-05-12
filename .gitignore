@@ -150,6 +150,9 @@ activemq-data/
 # Logs
 logs/
 
+# Config with secrets (use settings.example.yaml as template)
+config/settings.yaml
+
 # Environments
 .env
 .envrc

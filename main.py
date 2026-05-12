@@ -13,7 +13,7 @@ def cli():
 
 @cli.command()
 @click.option("--strategy", "-s", required=True, help="策略名称，如 ma_cross")
-@click.option("--timeframe", "-t", default="1h", help="K线周期，如 1h / 4h / 1d")
+@click.option("--timeframe", "-t", default=None, help="K线周期，如 1h / 4h / 1d")
 @click.option("--start", default=None, help="回测开始日期，如 2024-01-01")
 @click.option("--end", default=None, help="回测结束日期，如 2025-01-01")
 def backtest(strategy, timeframe, start, end):
@@ -21,6 +21,7 @@ def backtest(strategy, timeframe, start, end):
     settings = get_settings()
     bt_cfg = settings.get("backtest", {})
 
+    timeframe = timeframe or bt_cfg.get("timeframe", "1h")
     start = start or bt_cfg.get("start_date")
     end = end or bt_cfg.get("end_date")
 
@@ -40,7 +41,8 @@ def info():
     click.echo(f"交易对: {trading.get('pair')}")
     click.echo(f"手续费: {trading.get('commission')}")
     click.echo(f"滑点: {trading.get('slippage')}")
-    click.echo(f"周期: {', '.join(trading.get('timeframes', []))}")
+    data_cfg = settings.get("data", {})
+    click.echo(f"周期: {', '.join(data_cfg.get('timeframes', []))}")
 
 
 if __name__ == "__main__":
