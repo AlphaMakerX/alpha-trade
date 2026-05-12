@@ -3,9 +3,12 @@ import re
 from pathlib import Path
 
 import yaml
+from dotenv import load_dotenv
 
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 _CONFIG_DIR = _PROJECT_ROOT / "config"
+
+load_dotenv(_PROJECT_ROOT / ".env")
 
 _settings_cache: dict | None = None
 
@@ -27,9 +30,10 @@ def load_yaml(filename: str) -> dict:
     """加载 config/ 目录下的 YAML 文件。"""
     path = _CONFIG_DIR / filename
     if not path.exists():
-        example = path.with_suffix(".example.yaml")
-        if example.exists():
-            path = example
+        raise FileNotFoundError(
+            f"配置文件不存在: {path}\n"
+            f"请先复制模板: cp config/{filename.replace('.yaml', '.example.yaml')} config/{filename}"
+        )
     with open(path, "r", encoding="utf-8") as f:
         data = yaml.safe_load(f)
     return _resolve_env_vars(data) if data else {}

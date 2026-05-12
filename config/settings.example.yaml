@@ -3,9 +3,9 @@
 # 交易所 API 配置
 exchange:
   name: binance
-  api_key: ${EXCHANGE_API_KEY}
-  secret: ${EXCHANGE_SECRET}
-  sandbox: true  # 是否使用沙盒环境
+  api_key: ${BINANCE_API_KEY}
+  secret: ${BINANCE_SECRET_KEY}
+  sandbox: ${USE_TESTNET}  # 是否使用测试网
 
 # 交易对
 trading:
@@ -35,7 +35,7 @@ database:
   host: localhost
   port: 5432
   name: alpha_trade
-  user: ${DB_USER}
+  user: postgres
   password: ${DB_PASSWORD}
 
 # Redis

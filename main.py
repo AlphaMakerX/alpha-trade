@@ -45,5 +45,32 @@ def info():
     click.echo(f"周期: {', '.join(data_cfg.get('timeframes', []))}")
 
 
+@cli.command()
+def initdb():
+    """初始化数据库表结构"""
+    from data.storage.postgres import init_db
+
+    init_db()
+    click.echo("数据库初始化完成")
+
+
+@cli.command()
+@click.option("--pair", "-p", default="ETH/USDT", help="交易对")
+@click.option("--timeframe", "-t", default="1h", help="K线周期")
+@click.option("--start", "-s", required=True, help="开始日期，如 2024-01-01")
+def fetch(pair, timeframe, start):
+    """从 Binance 拉取 K线数据并存入数据库"""
+    from datetime import datetime, timezone
+
+    from data.feeds.binance import fetch_all_klines
+
+    start_dt = datetime.strptime(start, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+
+    logger.info(f"开始拉取: {pair} {timeframe} from {start}")
+    total = fetch_all_klines(pair, timeframe, start_dt)
+    click.echo(f"完成，共写入 {total} 条数据")
+
+
+
 if __name__ == "__main__":
     cli()
