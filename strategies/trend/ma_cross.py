@@ -12,11 +12,11 @@ class MaCross(BaseStrategy):
     死叉（快线下穿慢线）时平仓。止损根据 ATR 动态调整。
     """
 
-    fast_period = 35
-    slow_period = 50
-    trend_period = 200
-    atr_period = 14
-    atr_multiplier = 2.0
+    fast_period = 45
+    slow_period = 200
+    trend_period = 100
+    atr_period = 16
+    atr_multiplier = 1.5
 
     def init(self):
         close = pd.Series(self.data.Close)

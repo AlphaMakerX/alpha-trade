@@ -7,11 +7,11 @@ from ta.volatility import AverageTrueRange
 
 from data.feeds.binance import fetch_klines, _ms_to_dt
 
-FAST = 35
-SLOW = 50
-TREND = 200
-ATR_PERIOD = 14
-ATR_MULT = 2.0
+FAST = 45
+SLOW = 200
+TREND = 100
+ATR_PERIOD = 16
+ATR_MULT = 1.5
 BARS_NEEDED = TREND + 2
 
 
