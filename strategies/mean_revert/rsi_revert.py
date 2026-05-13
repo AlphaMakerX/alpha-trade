@@ -14,10 +14,10 @@ class RsiRevert(BaseStrategy):
     """
 
     rsi_period = 14
-    oversold = 30
-    overbought = 70
-    trend_period = 100
-    atr_period = 16
+    oversold = 25
+    overbought = 75
+    trend_period = 200
+    atr_period = 20
     atr_multiplier = 1.5
 
     @classmethod
