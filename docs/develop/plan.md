@@ -72,12 +72,12 @@
 基于回测结果优化策略，引入参数调优机制。
 
 ### 任务清单
-- [ ] 分析首次回测结果，识别策略弱点
-- [ ] 实现 `optimization/param_optimizer.py`，支持网格搜索参数优化
-- [ ] 实现 Walk-Forward 分析，防止过拟合
-- [ ] 实现 `risk/risk_manager.py` 风控模块（最大回撤限制、动态止损）
+- [x] 分析首次回测结果，识别策略弱点（交易过频、假信号多、无止损）
+- [x] 实现网格搜索参数优化（`engine/backtest.py` 的 `run_optimize()`，基于 `Backtest.optimize()`）
+- [x] 实现 Walk-Forward 分析，防止过拟合（`engine/backtest.py` 的 `run_walk_forward()`）
+- [x] 实现动态止损（ATR 动态止损，替代固定比例止损）
 - [ ] 新增第二个策略（如 RSI 均值回归），与 MA 交叉策略对比绩效
-- [ ] 样本外测试（70% 训练集 / 30% 测试集）
+- [x] 样本外测试（2023-2024 vs 2025-2026 分段回测验证）
 
 ---
 

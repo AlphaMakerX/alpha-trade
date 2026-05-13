@@ -38,6 +38,16 @@ class MaCross(BaseStrategy):
     atr_multiplier = 1.5
 
     @classmethod
+    def optimize_params(cls) -> dict:
+        return {
+            "fast_period": range(10, 55, 5),
+            "slow_period": range(30, 210, 10),
+            "trend_period": range(100, 350, 50),
+            "atr_period": range(10, 22, 2),
+            "atr_multiplier": [i / 10 for i in range(15, 40, 5)],
+        }
+
+    @classmethod
     def compute_signal(cls, df: pd.DataFrame) -> SignalResult:
         """基于 DataFrame 计算当前信号，复用策略参数和判断逻辑。"""
         close, high, low = df["close"], df["high"], df["low"]

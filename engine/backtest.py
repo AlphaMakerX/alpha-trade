@@ -7,10 +7,12 @@ from loguru import logger
 
 from data.storage.postgres import query_klines
 from strategies.trend.ma_cross import MaCross
+from strategies.mean_revert.rsi_revert import RsiRevert
 from utils.config import get_settings
 
 STRATEGY_MAP = {
     "ma_cross": MaCross,
+    "rsi_revert": RsiRevert,
 }
 
 
@@ -83,35 +85,25 @@ def run_optimize(strategy_name: str, timeframe: str, start: str, end: str) -> st
         commission=trading.get("commission", 0.001),
     )
 
-    logger.info("开始参数优化（网格搜索）...")
+    strategy_cls = STRATEGY_MAP[strategy_name]
+    opt_params = strategy_cls.optimize_params()
 
-    stats = bt.optimize(
-        **_OPTIMIZE_PARAMS,
-        constraint=lambda p: p.fast_period < p.slow_period,
-        maximize="SQN",
-    )
+    logger.info(f"开始参数优化（网格搜索），策略: {strategy_name}...")
+
+    constraint = (lambda p: p.fast_period < p.slow_period) if "fast_period" in opt_params else None
+    kwargs = {**opt_params, "maximize": "SQN"}
+    if constraint:
+        kwargs["constraint"] = constraint
+
+    stats = bt.optimize(**kwargs)
 
     s = stats["_strategy"]
-    lines = [
-        "\n=== 最优参数 ===",
-        f"fast_period:     {s.fast_period}",
-        f"slow_period:     {s.slow_period}",
-        f"trend_period:    {s.trend_period}",
-        f"atr_period:      {s.atr_period}",
-        f"atr_multiplier:  {s.atr_multiplier}",
-        "\n=== 回测指标 ===",
-        str(stats),
-    ]
+    lines = ["\n=== 最优参数 ==="]
+    for param_name in opt_params:
+        lines.append(f"  {param_name}: {getattr(s, param_name)}")
+    lines.append("\n=== 回测指标 ===")
+    lines.append(str(stats))
     return "\n".join(lines)
-
-
-_OPTIMIZE_PARAMS = {
-    "fast_period": range(10, 55, 5),
-    "slow_period": range(30, 210, 10),
-    "trend_period": range(100, 350, 50),
-    "atr_period": range(10, 22, 2),
-    "atr_multiplier": [i / 10 for i in range(15, 40, 5)],
-}
 
 
 def run_walk_forward(
@@ -143,6 +135,33 @@ def run_walk_forward(
     if df_all.empty:
         return "无数据，请先运行 fetch 拉取数据"
 
+    opt_params = strategy_cls.optimize_params()
+    constraint = (lambda p: p.fast_period < p.slow_period) if "fast_period" in opt_params else None
+    opt_kwargs = {**opt_params, "maximize": "SQN"}
+    if constraint:
+        opt_kwargs["constraint"] = constraint
+
+    def _optimize_and_test(train_df, test_df, win_num, test_label):
+        bt_train = Backtest(train_df, strategy_cls, cash=cash, commission=commission)
+        train_stats = bt_train.optimize(**opt_kwargs)
+
+        s = train_stats["_strategy"]
+        best_params = {name: getattr(s, name) for name in opt_params}
+
+        bt_test = Backtest(test_df, strategy_cls, cash=cash, commission=commission)
+        test_stats = bt_test.run(**best_params)
+
+        return {
+            "window": win_num,
+            "test": test_label,
+            "params": best_params,
+            "return": test_stats["Return [%]"],
+            "max_dd": test_stats["Max. Drawdown [%]"],
+            "trades": test_stats["# Trades"],
+            "win_rate": test_stats["Win Rate [%]"],
+            "sqn": test_stats["SQN"],
+        }
+
     # 滚动窗口
     results = []
     window_start = start_dt
@@ -164,39 +183,9 @@ def run_walk_forward(
             f"测试 {train_end.date()} ~ {test_end.date()}"
         )
 
-        # 训练：优化参数
-        bt_train = Backtest(train_df, strategy_cls, cash=cash, commission=commission)
-        train_stats = bt_train.optimize(
-            **_OPTIMIZE_PARAMS,
-            constraint=lambda p: p.fast_period < p.slow_period,
-            maximize="SQN",
-        )
-
-        # 提取最优参数
-        s = train_stats["_strategy"]
-        best_params = {
-            "fast_period": s.fast_period,
-            "slow_period": s.slow_period,
-            "trend_period": s.trend_period,
-            "atr_period": s.atr_period,
-            "atr_multiplier": s.atr_multiplier,
-        }
-
-        # 测试：用训练得到的参数跑回测
-        bt_test = Backtest(test_df, strategy_cls, cash=cash, commission=commission)
-        test_stats = bt_test.run(**best_params)
-
-        results.append({
-            "window": window_num,
-            "train": f"{window_start.date()} ~ {train_end.date()}",
-            "test": f"{train_end.date()} ~ {test_end.date()}",
-            "params": best_params,
-            "return": test_stats["Return [%]"],
-            "max_dd": test_stats["Max. Drawdown [%]"],
-            "trades": test_stats["# Trades"],
-            "win_rate": test_stats["Win Rate [%]"],
-            "sqn": test_stats["SQN"],
-        })
+        results.append(_optimize_and_test(
+            train_df, test_df, window_num, f"{train_end.date()} ~ {test_end.date()}"
+        ))
 
         window_start = train_end
         window_num += 1
@@ -204,8 +193,8 @@ def run_walk_forward(
     # 处理最后一段不足 test_months 的数据
     if window_start + relativedelta(months=train_months) < end_dt:
         train_end = window_start + relativedelta(months=train_months)
-        test_df = df_all[(df_all.index >= train_end) & (df_all.index < end_dt)]
         train_df = df_all[(df_all.index >= window_start) & (df_all.index < train_end)]
+        test_df = df_all[(df_all.index >= train_end) & (df_all.index < end_dt)]
 
         if not train_df.empty and not test_df.empty:
             logger.info(
@@ -213,44 +202,17 @@ def run_walk_forward(
                 f"测试 {train_end.date()} ~ {end_dt.date()}"
             )
 
-            bt_train = Backtest(train_df, strategy_cls, cash=cash, commission=commission)
-            train_stats = bt_train.optimize(
-                **_OPTIMIZE_PARAMS,
-                constraint=lambda p: p.fast_period < p.slow_period,
-                maximize="SQN",
-            )
-
-            s = train_stats["_strategy"]
-            best_params = {
-                "fast_period": s.fast_period,
-                "slow_period": s.slow_period,
-                "trend_period": s.trend_period,
-                "atr_period": s.atr_period,
-                "atr_multiplier": s.atr_multiplier,
-            }
-
-            bt_test = Backtest(test_df, strategy_cls, cash=cash, commission=commission)
-            test_stats = bt_test.run(**best_params)
-
-            results.append({
-                "window": window_num,
-                "train": f"{window_start.date()} ~ {train_end.date()}",
-                "test": f"{train_end.date()} ~ {end_dt.date()}",
-                "params": best_params,
-                "return": test_stats["Return [%]"],
-                "max_dd": test_stats["Max. Drawdown [%]"],
-                "trades": test_stats["# Trades"],
-                "win_rate": test_stats["Win Rate [%]"],
-                "sqn": test_stats["SQN"],
-            })
+            results.append(_optimize_and_test(
+                train_df, test_df, window_num, f"{train_end.date()} ~ {end_dt.date()}"
+            ))
 
     # 格式化输出
     lines = ["\n=== Walk-Forward 分析结果 ===\n"]
     for r in results:
         lines.append(f"窗口 {r['window']}: {r['test']}")
         p = r["params"]
-        lines.append(f"  参数: fast={p['fast_period']}, slow={p['slow_period']}, "
-                      f"trend={p['trend_period']}, atr={p['atr_period']}, mult={p['atr_multiplier']}")
+        param_str = ", ".join(f"{k}={v}" for k, v in p.items())
+        lines.append(f"  参数: {param_str}")
         lines.append(f"  收益: {r['return']:.2f}%  回撤: {r['max_dd']:.2f}%  "
                       f"交易: {r['trades']}  胜率: {r['win_rate']:.1f}%  SQN: {r['sqn']:.2f}")
         lines.append("")

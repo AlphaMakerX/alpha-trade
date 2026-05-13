@@ -2,6 +2,7 @@ import pandas as pd
 from backtesting import Backtest
 
 from strategies.trend.ma_cross import MaCross
+from strategies.mean_revert.rsi_revert import RsiRevert
 
 
 def _make_ohlcv(prices: list[float]) -> pd.DataFrame:
@@ -50,5 +51,30 @@ def test_ma_cross_trend_filter_blocks_downtrend():
     df = _make_ohlcv(prices)
     bt = Backtest(df, MaCross, cash=10000, commission=0.001)
     stats = bt.run(fast_period=5, slow_period=15, trend_period=30, atr_period=10, atr_multiplier=2.0)
+
+    assert stats["# Trades"] == 0
+
+
+def test_rsi_revert_oversold_buys():
+    """RSI 超卖后反弹应产生交易。"""
+    # 长期上涨建立高趋势线，然后急跌让 RSI 进入超卖但价格仍在趋势线上方
+    prices = [50.0 + i * 2.0 for i in range(50)]  # 上涨到 148
+    prices += [prices[-1] - i * 3.0 for i in range(1, 8)]  # 急跌 21 点（148→127）
+    prices += [prices[-1] + i * 3 for i in range(1, 20)]  # 强反弹
+
+    df = _make_ohlcv(prices)
+    bt = Backtest(df, RsiRevert, cash=10000, commission=0.001)
+    stats = bt.run(rsi_period=7, oversold=40, overbought=65, trend_period=40, atr_period=10, atr_multiplier=3.0)
+
+    assert stats["# Trades"] > 0
+
+
+def test_rsi_revert_no_trade_in_flat_market():
+    """横盘场景：RSI 在中间区域，不应交易。"""
+    prices = [100.0] * 80
+
+    df = _make_ohlcv(prices)
+    bt = Backtest(df, RsiRevert, cash=10000, commission=0.001)
+    stats = bt.run(rsi_period=10, oversold=30, overbought=70, trend_period=20, atr_period=10, atr_multiplier=2.0)
 
     assert stats["# Trades"] == 0
