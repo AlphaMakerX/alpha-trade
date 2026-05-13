@@ -1,4 +1,9 @@
+import math
+import time
 from datetime import datetime, timezone
+from itertools import product
+from typing import Iterator
+
 from dateutil.relativedelta import relativedelta
 
 import pandas as pd
@@ -63,8 +68,48 @@ def run_backtest(strategy_name: str, timeframe: str, start: str, end: str) -> st
     return str(bt.run())
 
 
+def _generate_param_combos(opt_params: dict, constraint=None) -> list[dict]:
+    """生成参数组合列表，应用约束过滤。"""
+    names = list(opt_params.keys())
+    values = [list(v) for v in opt_params.values()]
+    combos = [dict(zip(names, combo)) for combo in product(*values)]
+    if constraint:
+        combos = [c for c in combos if constraint(c)]
+    return combos
+
+
+def _grid_search_with_progress(bt: Backtest, combos: list[dict], label: str = "") -> tuple[dict, pd.Series]:
+    """带进度输出的网格搜索，返回 (最优参数, 最优 stats)。"""
+    total = len(combos)
+    best_sqn = -math.inf
+    best_params = None
+    best_stats = None
+    start_time = time.time()
+
+    for i, params in enumerate(combos):
+        stats = bt.run(**params)
+        sqn = stats["SQN"]
+
+        if not math.isnan(sqn) and sqn > best_sqn:
+            best_sqn = sqn
+            best_params = params
+            best_stats = stats
+
+        if (i + 1) % 50 == 0 or i + 1 == total:
+            elapsed = time.time() - start_time
+            speed = (i + 1) / elapsed
+            eta = (total - i - 1) / speed if speed > 0 else 0
+            logger.info(
+                f"{label}进度: {i + 1}/{total} ({(i + 1) / total * 100:.0f}%) "
+                f"已用 {elapsed:.0f}s, 预计剩余 {eta:.0f}s, "
+                f"当前最优 SQN={best_sqn:.2f}"
+            )
+
+    return best_params, best_stats
+
+
 def run_optimize(strategy_name: str, timeframe: str, start: str, end: str) -> str:
-    """网格搜索最优参数，返回格式化结果。"""
+    """网格搜索最优参数，带进度输出。"""
     settings = get_settings()
     bt_cfg = settings.get("backtest", {})
     trading = settings.get("trading", {})
@@ -78,31 +123,27 @@ def run_optimize(strategy_name: str, timeframe: str, start: str, end: str) -> st
     if df.empty:
         return "无数据，请先运行 fetch 拉取数据"
 
+    strategy_cls = STRATEGY_MAP[strategy_name]
+    opt_params = strategy_cls.optimize_params()
+    constraint_fn = (lambda c: c["fast_period"] < c["slow_period"]) if "fast_period" in opt_params else None
+    combos = _generate_param_combos(opt_params, constraint_fn)
+
     bt = Backtest(
         df,
-        STRATEGY_MAP[strategy_name],
+        strategy_cls,
         cash=bt_cfg.get("initial_capital", 10000),
         commission=trading.get("commission", 0.001),
     )
 
-    strategy_cls = STRATEGY_MAP[strategy_name]
-    opt_params = strategy_cls.optimize_params()
+    logger.info(f"开始参数优化: 策略={strategy_name}, 组合数={len(combos)}")
 
-    logger.info(f"开始参数优化（网格搜索），策略: {strategy_name}...")
+    best_params, best_stats = _grid_search_with_progress(bt, combos)
 
-    constraint = (lambda p: p.fast_period < p.slow_period) if "fast_period" in opt_params else None
-    kwargs = {**opt_params, "maximize": "SQN"}
-    if constraint:
-        kwargs["constraint"] = constraint
-
-    stats = bt.optimize(**kwargs)
-
-    s = stats["_strategy"]
     lines = ["\n=== 最优参数 ==="]
     for param_name in opt_params:
-        lines.append(f"  {param_name}: {getattr(s, param_name)}")
+        lines.append(f"  {param_name}: {best_params[param_name]}")
     lines.append("\n=== 回测指标 ===")
-    lines.append(str(stats))
+    lines.append(str(best_stats))
     return "\n".join(lines)
 
 
@@ -136,17 +177,12 @@ def run_walk_forward(
         return "无数据，请先运行 fetch 拉取数据"
 
     opt_params = strategy_cls.optimize_params()
-    constraint = (lambda p: p.fast_period < p.slow_period) if "fast_period" in opt_params else None
-    opt_kwargs = {**opt_params, "maximize": "SQN"}
-    if constraint:
-        opt_kwargs["constraint"] = constraint
+    constraint_fn = (lambda c: c["fast_period"] < c["slow_period"]) if "fast_period" in opt_params else None
+    combos = _generate_param_combos(opt_params, constraint_fn)
 
     def _optimize_and_test(train_df, test_df, win_num, test_label):
         bt_train = Backtest(train_df, strategy_cls, cash=cash, commission=commission)
-        train_stats = bt_train.optimize(**opt_kwargs)
-
-        s = train_stats["_strategy"]
-        best_params = {name: getattr(s, name) for name in opt_params}
+        best_params, _ = _grid_search_with_progress(bt_train, combos, label=f"窗口{win_num} ")
 
         bt_test = Backtest(test_df, strategy_cls, cash=cash, commission=commission)
         test_stats = bt_test.run(**best_params)

@@ -27,12 +27,12 @@ class RsiRevert(BaseStrategy):
     @classmethod
     def optimize_params(cls) -> dict:
         return {
-            "rsi_period": range(10, 22, 2),
-            "oversold": range(20, 40, 5),
-            "overbought": range(60, 85, 5),
-            "trend_period": range(50, 250, 50),
-            "atr_period": range(10, 22, 2),
-            "atr_multiplier": [i / 10 for i in range(15, 40, 5)],
+            "rsi_period": [10, 14, 18],
+            "oversold": [25, 30, 35],
+            "overbought": [65, 70, 75],
+            "trend_period": [50, 100, 200],
+            "atr_period": [12, 16, 20],
+            "atr_multiplier": [1.5, 2.0, 3.0],
         }
 
     def init(self):

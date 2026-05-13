@@ -40,11 +40,11 @@ class MaCross(BaseStrategy):
     @classmethod
     def optimize_params(cls) -> dict:
         return {
-            "fast_period": range(10, 55, 5),
-            "slow_period": range(30, 210, 10),
-            "trend_period": range(100, 350, 50),
-            "atr_period": range(10, 22, 2),
-            "atr_multiplier": [i / 10 for i in range(15, 40, 5)],
+            "fast_period": range(10, 55, 10),
+            "slow_period": range(50, 210, 30),
+            "trend_period": [100, 200],
+            "atr_period": [12, 16, 20],
+            "atr_multiplier": [1.5, 2.0, 3.0],
         }
 
     @classmethod
