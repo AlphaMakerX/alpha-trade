@@ -42,6 +42,23 @@ def optimize(strategy, timeframe, start, end):
 
 
 @cli.command()
+@click.option("--strategy", "-s", required=True, help="策略名称，如 ma_cross")
+@click.option("--timeframe", "-t", default=None, help="K线周期")
+@click.option("--start", default=None, help="开始日期")
+@click.option("--end", default=None, help="结束日期")
+@click.option("--train-months", default=12, help="训练窗口月数")
+@click.option("--test-months", default=6, help="测试窗口月数")
+def walkforward(strategy, timeframe, start, end, train_months, test_months):
+    """Walk-Forward 分析：滚动窗口训练+测试，验证参数稳定性"""
+    from engine.backtest import STRATEGY_MAP, run_walk_forward
+
+    if strategy not in STRATEGY_MAP:
+        click.echo(f"未知策略: {strategy}，可选: {', '.join(STRATEGY_MAP)}")
+        return
+    click.echo(run_walk_forward(strategy, timeframe, start, end, train_months, test_months))
+
+
+@cli.command()
 @click.option("--pair", "-p", default="ETH/USDT", help="交易对")
 @click.option("--timeframe", "-t", default="1h", help="K线周期")
 def signal(pair, timeframe):
