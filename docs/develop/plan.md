@@ -26,13 +26,14 @@
 完成 ETH/USDT K线数据的采集、清洗与持久化存储。
 
 ### 任务清单
-- [ ] 实现 `kline_collector.py`，通过 ccxt 拉取 Binance ETH/USDT OHLCV 数据
-- [ ] 支持多时间粒度（1m / 5m / 15m / 1h / 4h / 1d）
-- [ ] 实现增量拉取逻辑，避免重复请求，处理 API 限频
-- [ ] 实现 `data_cleaner.py`，完成去重、缺失值填充、异常值检测
-- [ ] 搭建 PostgreSQL 数据库，设计 K线数据表结构（支持多交易对、多时间粒度）
-- [ ] 实现数据入库逻辑，记录元信息
-- [ ] 编写数据采集的单元测试
+- [x] 实现 `data/feeds/binance.py`，通过 Binance REST API 拉取 ETH/USDT OHLCV 数据（含 close_time、quote_asset_volume、number_of_trades、taker_buy 等完整字段）
+- [x] 支持多时间粒度（1m / 5m / 15m / 1h / 4h / 1d）
+- [x] 实现增量拉取逻辑，避免重复请求，处理 API 限频与重试
+- [x] 实现 `data/feeds/cleaner.py`，完成去重、缺失值填充、异常值检测
+- [x] 搭建 PostgreSQL 数据库，使用 SQLAlchemy Core 定义 K线数据表结构（支持多交易对、多时间粒度，open_time/close_time 使用 TIMESTAMPTZ）
+- [x] 实现数据入库逻辑（ON CONFLICT DO NOTHING 防重复）
+- [x] 编写数据采集的单元测试
+- [ ] 支持多交易对批量拉取（当前仅支持单交易对 CLI 调用）
 
 ---
 
@@ -42,11 +43,11 @@
 实现策略基类和第一个可运行的趋势跟踪策略。
 
 ### 任务清单
-- [ ] 实现 `strategies/base.py` 策略基类（generate_signals / calculate_position_size / risk_check）
-- [ ] 实现 `strategies/trend/ma_cross.py` 双均线交叉策略
-- [ ] 实现基础技术指标计算（MA、EMA、RSI、MACD）
-- [ ] 策略信号输出标准化：1（买入）/ -1（卖出）/ 0（持有）
-- [ ] 编写策略的单元测试
+- [x] 实现 `strategies/base.py` 策略基类（继承 Backtesting.py Strategy）
+- [x] 实现 `strategies/trend/ma_cross.py` 双均线交叉策略
+- [x] 实现基础技术指标计算（使用 `ta` 库：SMA）
+- [x] 策略信号输出标准化（通过 Backtesting.py 的 buy/position.close 驱动）
+- [x] 编写策略的单元测试
 
 ---
 
@@ -56,11 +57,11 @@
 基于 Backtesting.py 框架对策略进行历史数据验证。
 
 ### 任务清单
-- [ ] 集成 Backtesting.py 框架，封装统一的回测入口
-- [ ] 将策略适配为 Backtesting.py 的 Strategy 子类
-- [ ] 配置回测参数（初始资金、手续费 0.05%、滑点等）
-- [ ] 从 PostgreSQL 读取历史数据，转换为回测所需格式
-- [ ] 使用历史数据对 MA 交叉策略完成首次回测验证
+- [x] 集成 Backtesting.py 框架，封装统一的回测入口（`main.py backtest` 命令）
+- [x] 将策略适配为 Backtesting.py 的 Strategy 子类
+- [x] 配置回测参数（初始资金、手续费，从 settings.yaml 读取）
+- [x] 从 PostgreSQL 读取历史数据，转换为回测所需格式
+- [x] 使用历史数据对 MA 交叉策略完成首次回测验证
 - [ ] 利用框架内置功能生成绩效报告与可视化图表
 
 ---

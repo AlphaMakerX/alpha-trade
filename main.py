@@ -18,19 +18,62 @@ def cli():
 @click.option("--end", default=None, help="回测结束日期，如 2025-01-01")
 def backtest(strategy, timeframe, start, end):
     """运行策略回测"""
+    from datetime import datetime, timezone
+
+    from backtesting import Backtest
+
+    from data.storage.postgres import query_klines
+    from strategies.trend.ma_cross import MaCross
+
+    STRATEGY_MAP = {
+        "ma_cross": MaCross,
+    }
+
+    if strategy not in STRATEGY_MAP:
+        click.echo(f"未知策略: {strategy}，可选: {', '.join(STRATEGY_MAP)}")
+        return
+
     settings = get_settings()
     bt_cfg = settings.get("backtest", {})
+    trading = settings.get("trading", {})
 
     timeframe = timeframe or bt_cfg.get("timeframe", "1h")
     start = start or bt_cfg.get("start_date")
     end = end or bt_cfg.get("end_date")
+    pair = trading.get("pair", "ETH/USDT")
+    initial_capital = bt_cfg.get("initial_capital", 10000)
+    commission = trading.get("commission", 0.001)
 
     logger.info(f"开始回测: strategy={strategy}, timeframe={timeframe}")
     logger.info(f"回测区间: {start} ~ {end}")
-    logger.info(f"初始资金: {bt_cfg.get('initial_capital', 10000)} USDT")
+    logger.info(f"初始资金: {initial_capital} USDT")
 
-    # TODO: Phase 4 实现回测引擎调用
-    logger.warning("回测引擎尚未实现，请等待后续开发")
+    start_dt = datetime.strptime(start, "%Y-%m-%d").replace(tzinfo=timezone.utc) if start else None
+    end_dt = datetime.strptime(end, "%Y-%m-%d").replace(tzinfo=timezone.utc) if end else None
+
+    df = query_klines(pair, timeframe, start_dt, end_dt)
+    if df.empty:
+        click.echo("无数据，请先运行 fetch 拉取数据")
+        return
+
+    # Backtesting.py 要求列名首字母大写，index 为 datetime
+    df = df.rename(columns={
+        "open": "Open",
+        "high": "High",
+        "low": "Low",
+        "close": "Close",
+        "volume": "Volume",
+    })
+    df = df.set_index("open_time")
+
+    bt = Backtest(
+        df,
+        STRATEGY_MAP[strategy],
+        cash=initial_capital,
+        commission=commission,
+    )
+    stats = bt.run()
+    click.echo(stats)
 
 
 @cli.command()
