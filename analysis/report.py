@@ -158,6 +158,7 @@ def write_backtest_report(
         "| --- | ---: |",
         f"| Strategy Return [%] | {_format_value(stats.get('Return [%]'))} |",
         f"| Buy & Hold Return [%] | {_format_value(stats.get('Buy & Hold Return [%]'))} |",
+        "| Cash Benchmark Return [%] | 0.0000 |",
         f"| Commissions [$] | {_format_value(commissions_paid)} |",
         f"| Configured commission | {_format_value(commission)} |",
         f"| Configured spread/slippage | {_format_value(spread)} |",

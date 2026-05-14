@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 import pandas as pd
 
 from engine.data import load_ohlcv, parse_utc_date
+from engine.evaluation import annual_segments, quarterly_segments, _settings_with_costs, _summary_row
 from engine.factory import backtest_options, make_backtest
 from strategies.trend.ma_cross import MaCross
 
@@ -98,3 +99,60 @@ def test_make_backtest_applies_risk_settings():
     assert bt._strategy.max_position_pct == 0.5
     assert bt._strategy.cooldown_bars == 12
     assert MaCross.risk_per_trade != 0.02
+
+
+def test_evaluation_segments_cover_requested_range():
+    start = datetime(2024, 1, 1, tzinfo=timezone.utc)
+    end = datetime(2025, 1, 1, tzinfo=timezone.utc)
+
+    annual = annual_segments(start, end)
+    quarterly = quarterly_segments(start, end)
+
+    assert len(annual) == 1
+    assert annual[0].start == start
+    assert annual[0].end == end
+    assert [segment.start.month for segment in quarterly] == [1, 4, 7, 10]
+    assert quarterly[-1].end == end
+
+
+def test_evaluation_cost_settings_do_not_mutate_original():
+    settings = {"trading": {"commission": 0.001, "slippage": 0.0005}}
+
+    adjusted = _settings_with_costs(settings, 0.002, 0.001)
+
+    assert adjusted["trading"]["commission"] == 0.002
+    assert adjusted["trading"]["slippage"] == 0.001
+    assert settings["trading"]["commission"] == 0.001
+    assert settings["trading"]["slippage"] == 0.0005
+
+
+def test_evaluation_summary_row_extracts_core_metrics():
+    stats = pd.Series({
+        "Return [%]": 6.0,
+        "Buy & Hold Return [%]": 45.0,
+        "Sharpe Ratio": 0.75,
+        "Max. Drawdown [%]": -4.0,
+        "# Trades": 45,
+        "Win Rate [%]": 44.4,
+        "Profit Factor": 1.34,
+        "Exposure Time [%]": 7.0,
+    })
+    start = datetime(2024, 1, 1, tzinfo=timezone.utc)
+    end = datetime(2025, 1, 1, tzinfo=timezone.utc)
+
+    row = _summary_row(
+        group="full",
+        label="full",
+        start=start,
+        end=end,
+        bars=8785,
+        commission=0.001,
+        slippage=0.0005,
+        stats=stats,
+    )
+
+    assert row["return_pct"] == 6.0
+    assert row["buy_hold_return_pct"] == 45.0
+    assert row["trades"] == 45
+    assert row["start"] == "2024-01-01"
+    assert row["end"] == "2025-01-01"

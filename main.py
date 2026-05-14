@@ -65,6 +65,23 @@ def walkforward(strategy, timeframe, start, end, train_months, test_months):
 
 
 @cli.command()
+@click.option("--strategy", "-s", required=True, help="策略名称，如 regime_switch")
+@click.option("--timeframe", "-t", default=None, help="K线周期")
+@click.option("--start", default=None, help="开始日期，如 2024-01-01")
+@click.option("--end", default=None, help="结束日期，如 2025-01-01")
+def evaluate(strategy, timeframe, start, end):
+    """评估默认参数：全区间、年度/季度分段和成本压力测试"""
+    from engine.evaluation import run_strategy_evaluation
+    from strategies.registry import list_strategies
+
+    strategies = list_strategies()
+    if strategy not in strategies:
+        click.echo(f"未知策略: {strategy}，可选: {', '.join(strategies)}")
+        return
+    click.echo(run_strategy_evaluation(strategy, timeframe, start, end))
+
+
+@cli.command()
 @click.option("--pair", "-p", default="ETH/USDT", help="交易对")
 @click.option("--timeframe", "-t", default="1h", help="K线周期")
 def signal(pair, timeframe):

@@ -83,3 +83,6 @@ def test_write_backtest_report_creates_markdown_and_trades(tmp_path, monkeypatch
     assert paths.markdown_path.exists()
     assert paths.trades_path is not None
     assert paths.trades_path.exists()
+    report = paths.markdown_path.read_text(encoding="utf-8")
+    assert "Buy & Hold Return [%]" in report
+    assert "Cash Benchmark Return [%]" in report
