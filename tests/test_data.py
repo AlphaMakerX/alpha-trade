@@ -104,3 +104,48 @@ def test_fetch_all_skips_complete_existing_range(monkeypatch):
 
     assert total == 0
     assert calls == []
+
+
+def test_fetch_all_cleans_rows_before_upsert(monkeypatch):
+    start = datetime(2024, 1, 1, tzinfo=timezone.utc)
+    end = datetime(2024, 1, 1, 1, tzinfo=timezone.utc)
+    inserted_rows = []
+
+    monkeypatch.setattr(binance, "get_latest_open_time", lambda pair, timeframe: None)
+    monkeypatch.setattr(binance.time, "sleep", lambda seconds: None)
+
+    def row(open_time, open_price, close_price):
+        return [
+            open_time,
+            open_price,
+            max(open_price, close_price) + 1,
+            min(open_price, close_price) - 1,
+            close_price,
+            1000.0,
+            open_time,
+            1000.0,
+            10,
+            500.0,
+            500.0,
+        ]
+
+    def fake_fetch_klines(pair, timeframe, since, limit=1000, end=None):
+        return [
+            row(start, 100.0, 101.0),
+            row(start, 102.0, 103.0),
+            row(end, 0.0, 104.0),
+        ]
+
+    def fake_upsert_klines(pair, timeframe, rows):
+        inserted_rows.extend(rows)
+        return len(rows)
+
+    monkeypatch.setattr(binance, "fetch_klines", fake_fetch_klines)
+    monkeypatch.setattr(binance, "upsert_klines", fake_upsert_klines)
+
+    total = binance.fetch_all_klines("ETH/USDT", "1h", start, end)
+
+    assert total == 1
+    assert len(inserted_rows) == 1
+    assert inserted_rows[0][0] == start
+    assert inserted_rows[0][1] == 102.0

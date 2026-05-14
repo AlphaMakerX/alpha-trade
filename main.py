@@ -18,10 +18,12 @@ def cli():
 @click.option("--end", default=None, help="回测结束日期，如 2025-01-01")
 def backtest(strategy, timeframe, start, end):
     """运行策略回测"""
-    from engine.backtest import STRATEGY_MAP, run_backtest
+    from engine.backtest import run_backtest
+    from strategies.registry import list_strategies
 
-    if strategy not in STRATEGY_MAP:
-        click.echo(f"未知策略: {strategy}，可选: {', '.join(STRATEGY_MAP)}")
+    strategies = list_strategies()
+    if strategy not in strategies:
+        click.echo(f"未知策略: {strategy}，可选: {', '.join(strategies)}")
         return
     click.echo(run_backtest(strategy, timeframe, start, end))
 
@@ -33,10 +35,12 @@ def backtest(strategy, timeframe, start, end):
 @click.option("--end", default=None, help="结束日期，如 2026-01-01")
 def optimize(strategy, timeframe, start, end):
     """网格搜索最优策略参数"""
-    from engine.backtest import STRATEGY_MAP, run_optimize
+    from engine.backtest import run_optimize
+    from strategies.registry import list_strategies
 
-    if strategy not in STRATEGY_MAP:
-        click.echo(f"未知策略: {strategy}，可选: {', '.join(STRATEGY_MAP)}")
+    strategies = list_strategies()
+    if strategy not in strategies:
+        click.echo(f"未知策略: {strategy}，可选: {', '.join(strategies)}")
         return
     click.echo(run_optimize(strategy, timeframe, start, end))
 
@@ -50,10 +54,12 @@ def optimize(strategy, timeframe, start, end):
 @click.option("--test-months", default=6, help="测试窗口月数")
 def walkforward(strategy, timeframe, start, end, train_months, test_months):
     """Walk-Forward 分析：滚动窗口训练+测试，验证参数稳定性"""
-    from engine.backtest import STRATEGY_MAP, run_walk_forward
+    from engine.backtest import run_walk_forward
+    from strategies.registry import list_strategies
 
-    if strategy not in STRATEGY_MAP:
-        click.echo(f"未知策略: {strategy}，可选: {', '.join(STRATEGY_MAP)}")
+    strategies = list_strategies()
+    if strategy not in strategies:
+        click.echo(f"未知策略: {strategy}，可选: {', '.join(strategies)}")
         return
     click.echo(run_walk_forward(strategy, timeframe, start, end, train_months, test_months))
 

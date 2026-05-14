@@ -2,7 +2,7 @@ from datetime import datetime
 
 import pandas as pd
 from loguru import logger
-from sqlalchemy import func, insert, select
+from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from data.storage.database import get_engine

@@ -1,6 +1,7 @@
 import pandas as pd
 from backtesting import Backtest
 
+from strategies.registry import get_strategy, list_strategies
 from strategies.trend.ma_cross import MaCross
 from strategies.mean_revert.rsi_revert import RsiRevert
 
@@ -78,3 +79,19 @@ def test_rsi_revert_no_trade_in_flat_market():
     stats = bt.run(rsi_period=10, oversold=30, overbought=70, trend_period=20, atr_period=10, atr_multiplier=2.0)
 
     assert stats["# Trades"] == 0
+
+
+def test_strategy_registry_lists_available_strategies():
+    assert list_strategies() == ["ma_cross", "rsi_revert"]
+    assert get_strategy("ma_cross") is MaCross
+    assert get_strategy("rsi_revert") is RsiRevert
+
+
+def test_strategy_registry_rejects_unknown_strategy():
+    try:
+        get_strategy("missing")
+    except KeyError as exc:
+        assert "ma_cross" in str(exc)
+        assert "rsi_revert" in str(exc)
+    else:
+        raise AssertionError("Expected KeyError")

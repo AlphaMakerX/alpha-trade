@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 import pandas as pd
 from loguru import logger
 
-from data.feeds.binance import fetch_klines, _ms_to_dt
+from data.feeds.binance import fetch_klines, timeframe_delta
 from strategies.trend.ma_cross import MaCross, SIGNAL_BUY, SIGNAL_SELL, SIGNAL_WATCH
 
 _SIGNAL_TEXT = {
@@ -17,7 +17,7 @@ def get_signal(pair: str, timeframe: str) -> str:
     """拉取最新 K线，复用 MaCross 策略计算信号。"""
     bars = MaCross.bars_needed()
     now = datetime.now(tz=timezone.utc)
-    since = _ms_to_dt(int((now.timestamp() - bars * 3600) * 1000))
+    since = now - bars * timeframe_delta(timeframe)
 
     logger.info(f"拉取最近 {bars} 根 {timeframe} K线...")
     rows = fetch_klines(pair, timeframe, since, limit=bars)
