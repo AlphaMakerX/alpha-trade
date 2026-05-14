@@ -76,7 +76,7 @@
 - [x] 实现网格搜索参数优化（`engine/backtest.py` 的 `run_optimize()`，基于 `Backtest.optimize()`）
 - [x] 实现 Walk-Forward 分析，防止过拟合（`engine/backtest.py` 的 `run_walk_forward()`）
 - [x] 实现动态止损（ATR 动态止损，替代固定比例止损）
-- [ ] 新增第二个策略（如 RSI 均值回归），与 MA 交叉策略对比绩效
+- [x] 新增第二个策略（RSI 均值回归 `strategies/mean_revert/rsi_revert.py`），与 MA 交叉策略对比绩效
 - [x] 样本外测试（2023-2024 vs 2025-2026 分段回测验证）
 
 ---
