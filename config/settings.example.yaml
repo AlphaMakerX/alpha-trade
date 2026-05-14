@@ -29,6 +29,15 @@ backtest:
   start_date: "2024-01-01"
   end_date: "2025-01-01"
   timeframe: 1h  # 回测使用的K线周期
+  finalize_trades: true  # 回测结束时强制结算未平仓交易，保证交易统计完整
+  exclusive_orders: true  # 同一时间只允许一个方向的一组订单
+  trade_on_close: false  # 是否在信号所在 K 线收盘价成交
+
+# 风控参数
+risk:
+  risk_per_trade: 0.01      # 单笔最多亏损权益比例
+  max_position_pct: 1.0     # 单笔最大仓位占权益比例
+  max_daily_loss_pct: 0.03  # 单日最大亏损阈值
 
 # 数据库
 database:

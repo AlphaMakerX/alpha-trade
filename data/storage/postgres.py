@@ -64,6 +64,27 @@ def get_latest_open_time(pair: str, timeframe: str) -> datetime | None:
         return conn.execute(stmt).scalar()
 
 
+def count_klines(
+    pair: str,
+    timeframe: str,
+    start: datetime | None = None,
+    end: datetime | None = None,
+) -> int:
+    """统计指定交易对/周期/区间内的 K线数量。"""
+    stmt = select(func.count()).select_from(klines).where(
+        klines.c.pair == pair,
+        klines.c.timeframe == timeframe,
+    )
+
+    if start is not None:
+        stmt = stmt.where(klines.c.open_time >= start)
+    if end is not None:
+        stmt = stmt.where(klines.c.open_time <= end)
+
+    with get_engine().connect() as conn:
+        return int(conn.execute(stmt).scalar() or 0)
+
+
 def query_klines(
     pair: str,
     timeframe: str,

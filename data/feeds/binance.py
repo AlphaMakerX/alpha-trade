@@ -4,7 +4,7 @@ from datetime import datetime, timedelta, timezone
 import requests
 from loguru import logger
 
-from data.storage.postgres import upsert_klines, get_latest_open_time
+from data.storage.postgres import count_klines, upsert_klines, get_latest_open_time
 
 BASE_URL = "https://data-api.binance.vision"
 
@@ -49,6 +49,7 @@ def fetch_klines(
     timeframe: str,
     since: datetime,
     limit: int = 1000,
+    end: datetime | None = None,
 ) -> list[list]:
     """从 Binance 公共 API 拉取一批 K线数据。
 
@@ -57,14 +58,18 @@ def fetch_klines(
     symbol = _pair_to_symbol(pair)
     interval = _TF_MAP.get(timeframe, timeframe)
 
+    params = {
+        "symbol": symbol,
+        "interval": interval,
+        "startTime": _dt_to_ms(since),
+        "limit": limit,
+    }
+    if end is not None:
+        params["endTime"] = _dt_to_ms(end)
+
     resp = requests.get(
         f"{BASE_URL}/api/v3/klines",
-        params={
-            "symbol": symbol,
-            "interval": interval,
-            "startTime": _dt_to_ms(since),
-            "limit": limit,
-        },
+        params=params,
         timeout=30,
     )
     resp.raise_for_status()
@@ -89,6 +94,20 @@ def fetch_klines(
     ]
 
 
+def _expected_bar_count(start: datetime, end: datetime, delta: timedelta) -> int:
+    """Return inclusive bar count from start to end for one fixed timeframe."""
+    if end < start:
+        return 0
+    return int((end - start).total_seconds() // delta.total_seconds()) + 1
+
+
+def _is_range_complete(pair: str, timeframe: str, start: datetime, end: datetime, delta: timedelta) -> bool:
+    expected = _expected_bar_count(start, end, delta)
+    existing = count_klines(pair, timeframe, start, end)
+    logger.info(f"区间完整性检查: {start} ~ {end}, 已有 {existing}/{expected} 根")
+    return existing >= expected
+
+
 def fetch_all_klines(
     pair: str,
     timeframe: str,
@@ -98,27 +117,33 @@ def fetch_all_klines(
 ) -> int:
     """批量拉取历史 K线数据并写入数据库。
 
-    支持增量：如果 DB 中已有数据，从最新时间点之后继续拉取。
+    支持增量和历史回补：
+    - 如果 start 到 DB 最新时间之间完整，则从最新时间点之后继续拉取。
+    - 如果区间内存在缺口，则从请求的 start 开始回补，重复数据由 upsert 跳过。
     返回总写入条数。
     """
     delta = _TF_DELTA[timeframe]
 
+    if end is None:
+        end = datetime.now(tz=timezone.utc)
+
     # 增量：检查 DB 中最新时间戳
     latest = get_latest_open_time(pair, timeframe)
     if latest is not None and latest >= start:
-        start = latest + delta
-        logger.info(f"增量拉取: 从 {start} 继续")
-
-    if end is None:
-        end = datetime.now(tz=timezone.utc)
+        complete_until = min(latest, end)
+        if _is_range_complete(pair, timeframe, start, complete_until, delta):
+            start = latest + delta
+            logger.info(f"历史区间完整，增量拉取: 从 {start} 继续")
+        else:
+            logger.info(f"发现历史缺口，回补拉取: 从 {start} 开始")
 
     total_inserted = 0
     current = start
     retries = 0
 
-    while current < end:
+    while current <= end:
         try:
-            ohlcv = fetch_klines(pair, timeframe, current, batch_size)
+            ohlcv = fetch_klines(pair, timeframe, current, batch_size, end=end)
             retries = 0  # 成功则重置
         except Exception as e:
             retries += 1
@@ -131,6 +156,12 @@ def fetch_all_klines(
 
         if not ohlcv:
             logger.info("无更多数据，拉取完成")
+            break
+
+        # 交易所通常会遵守 endTime，这里再做一层保护。
+        ohlcv = [row for row in ohlcv if row[0] <= end]
+        if not ohlcv:
+            logger.info("已到达结束时间，拉取完成")
             break
 
         inserted = upsert_klines(pair, timeframe, ohlcv)

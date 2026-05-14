@@ -150,6 +150,9 @@ activemq-data/
 # Logs
 logs/
 
+# Generated backtest reports
+artifacts/
+
 # Config with secrets (use settings.example.yaml as template)
 config/settings.yaml
 
