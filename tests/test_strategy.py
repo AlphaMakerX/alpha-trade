@@ -2,8 +2,11 @@ import pandas as pd
 from backtesting import Backtest
 
 from strategies.base import BaseStrategy
+from strategies.composite.regime_switch import RegimeSwitch
 from strategies.registry import get_strategy, list_strategies
 from strategies.trend.ma_cross import MaCross
+from strategies.trend.trend_breakout import TrendBreakout
+from strategies.mean_revert.bollinger_revert import BollingerRevert
 from strategies.mean_revert.rsi_revert import RsiRevert
 
 
@@ -107,9 +110,18 @@ def test_rsi_revert_no_trade_in_flat_market():
 
 
 def test_strategy_registry_lists_available_strategies():
-    assert list_strategies() == ["ma_cross", "rsi_revert"]
+    assert list_strategies() == [
+        "bollinger_revert",
+        "ma_cross",
+        "regime_switch",
+        "rsi_revert",
+        "trend_breakout",
+    ]
+    assert get_strategy("bollinger_revert") is BollingerRevert
     assert get_strategy("ma_cross") is MaCross
+    assert get_strategy("regime_switch") is RegimeSwitch
     assert get_strategy("rsi_revert") is RsiRevert
+    assert get_strategy("trend_breakout") is TrendBreakout
 
 
 def test_strategy_registry_rejects_unknown_strategy():
@@ -138,3 +150,122 @@ def test_risk_sizing_caps_max_position():
     stats = bt.run()
 
     assert stats["_trades"]["Size"].iloc[0] == 10
+
+
+def test_trend_breakout_buys_on_confirmed_breakout():
+    prices = [100.0] * 30
+    prices += [101.0 + i * 2.0 for i in range(30)]
+    prices += [prices[-1] - i * 1.0 for i in range(1, 20)]
+
+    df = _make_ohlcv(prices)
+    bt = Backtest(df, TrendBreakout, cash=10000, commission=0.001, finalize_trades=True)
+    stats = bt.run(
+        breakout_period=10,
+        exit_period=5,
+        trend_period=10,
+        trend_slope_period=3,
+        adx_period=5,
+        adx_threshold=0,
+        atr_period=5,
+        atr_multiplier=2.0,
+        volume_period=5,
+        volume_multiplier=0.0,
+        max_holding_bars=0,
+        trailing_atr_multiplier=2.0,
+        max_drawdown_pct=0,
+    )
+
+    assert stats["# Trades"] > 0
+
+
+def test_bollinger_revert_buys_in_range_oversold_touch():
+    prices = [100.0 + i * 0.1 for i in range(60)]
+    prices += [105.0, 103.0, 101.0, 100.0, 101.0, 103.0, 105.0]
+    prices += [105.0 + i * 0.1 for i in range(20)]
+
+    df = _make_ohlcv(prices)
+    bt = Backtest(df, BollingerRevert, cash=10000, commission=0.001, finalize_trades=True)
+    stats = bt.run(
+        rsi_period=5,
+        oversold=45,
+        exit_rsi=50,
+        bb_period=10,
+        bb_std=1.5,
+        adx_period=5,
+        max_adx=100,
+        trend_period=10,
+        trend_slope_period=3,
+        atr_period=5,
+        atr_multiplier=2.0,
+        max_holding_bars=20,
+        trailing_atr_multiplier=0,
+        max_drawdown_pct=0,
+    )
+
+    assert stats["# Trades"] > 0
+
+
+def test_regime_switch_buys_trend_breakout():
+    prices = [100.0] * 30
+    prices += [101.0 + i * 2.0 for i in range(30)]
+    prices += [prices[-1] - i * 1.0 for i in range(1, 20)]
+
+    df = _make_ohlcv(prices)
+    bt = Backtest(df, RegimeSwitch, cash=10000, commission=0.001, finalize_trades=True)
+    stats = bt.run(
+        breakout_period=10,
+        trend_exit_period=5,
+        trend_period=10,
+        trend_slope_period=3,
+        adx_period=5,
+        trend_adx_threshold=0,
+        range_adx_threshold=0,
+        atr_period=5,
+        trend_atr_multiplier=2.0,
+        mean_atr_multiplier=2.0,
+        volume_period=5,
+        volume_multiplier=0.0,
+        rsi_period=5,
+        oversold=30,
+        exit_rsi=50,
+        bb_period=10,
+        bb_std=2.0,
+        max_holding_bars=0,
+        trailing_atr_multiplier=2.0,
+        max_drawdown_pct=0,
+    )
+
+    assert stats["# Trades"] > 0
+
+
+def test_regime_switch_buys_range_reversion():
+    prices = [100.0 + i * 0.1 for i in range(60)]
+    prices += [105.0, 103.0, 101.0, 100.0, 101.0, 103.0, 105.0]
+    prices += [105.0 + i * 0.1 for i in range(20)]
+
+    df = _make_ohlcv(prices)
+    bt = Backtest(df, RegimeSwitch, cash=10000, commission=0.001, finalize_trades=True)
+    stats = bt.run(
+        breakout_period=10,
+        trend_exit_period=5,
+        trend_period=10,
+        trend_slope_period=3,
+        adx_period=5,
+        trend_adx_threshold=1000,
+        range_adx_threshold=100,
+        atr_period=5,
+        trend_atr_multiplier=2.0,
+        mean_atr_multiplier=2.0,
+        volume_period=5,
+        volume_multiplier=0.0,
+        rsi_period=5,
+        oversold=45,
+        exit_rsi=50,
+        bb_period=10,
+        bb_std=1.5,
+        max_holding_bars=20,
+        trailing_atr_multiplier=0,
+        max_drawdown_pct=0,
+    )
+
+    assert stats["# Trades"] > 0
