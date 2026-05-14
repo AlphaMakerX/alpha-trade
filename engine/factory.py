@@ -33,10 +33,23 @@ def backtest_options(settings: dict) -> dict:
     }
 
 
+def _strategy_with_risk_settings(strategy_cls, settings: dict):
+    risk_cfg = {
+        name: value
+        for name, value in settings.get("risk", {}).items()
+        if hasattr(strategy_cls, name)
+    }
+    if not risk_cfg:
+        return strategy_cls
+
+    name = f"{strategy_cls.__name__}WithRisk"
+    return type(name, (strategy_cls,), risk_cfg)
+
+
 def make_backtest(df: pd.DataFrame, strategy_cls, settings: dict) -> Backtest:
     """Create Backtest objects through a single strict factory."""
     return Backtest(
         df,
-        strategy_cls,
+        _strategy_with_risk_settings(strategy_cls, settings),
         **backtest_options(settings),
     )

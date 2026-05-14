@@ -90,6 +90,7 @@ class MaCross(BaseStrategy):
         return max(cls.fast_period, cls.slow_period, cls.trend_period) + 2
 
     def init(self):
+        self.init_risk()
         close = pd.Series(self.data.Close)
         high = pd.Series(self.data.High)
         low = pd.Series(self.data.Low)
@@ -108,13 +109,15 @@ class MaCross(BaseStrategy):
         )
 
     def next(self):
+        self.apply_risk_management(self.atr[-1])
+
         price = self.data.Close[-1]
         golden_cross = self.fast_ma[-2] <= self.slow_ma[-2] and self.fast_ma[-1] > self.slow_ma[-1]
         death_cross = self.fast_ma[-2] >= self.slow_ma[-2] and self.fast_ma[-1] < self.slow_ma[-1]
         above_trend = price > self.trend_ma[-1]
 
-        if golden_cross and above_trend and not self.position:
+        if golden_cross and above_trend and self.can_enter():
             sl = price - self.atr_multiplier * self.atr[-1]
-            self.buy(sl=sl)
+            self.buy_with_risk(price, sl)
         elif death_cross and self.position:
             self.position.close()

@@ -36,6 +36,7 @@ class RsiRevert(BaseStrategy):
         }
 
     def init(self):
+        self.init_risk()
         close = pd.Series(self.data.Close)
         high = pd.Series(self.data.High)
         low = pd.Series(self.data.Low)
@@ -51,13 +52,15 @@ class RsiRevert(BaseStrategy):
         )
 
     def next(self):
+        self.apply_risk_management(self.atr[-1])
+
         price = self.data.Close[-1]
         above_trend = price > self.trend_ma[-1]
 
         # RSI 超卖 + 趋势确认 → 买入
-        if self.rsi[-1] < self.oversold and above_trend and not self.position:
+        if self.rsi[-1] < self.oversold and above_trend and self.can_enter():
             sl = price - self.atr_multiplier * self.atr[-1]
-            self.buy(sl=sl)
+            self.buy_with_risk(price, sl)
 
         # RSI 超买 → 平仓
         elif self.rsi[-1] > self.overbought and self.position:

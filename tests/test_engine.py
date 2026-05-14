@@ -3,7 +3,8 @@ from datetime import datetime, timezone
 import pandas as pd
 
 from engine.data import load_ohlcv, parse_utc_date
-from engine.factory import backtest_options
+from engine.factory import backtest_options, make_backtest
+from strategies.trend.ma_cross import MaCross
 
 
 def test_parse_utc_date_returns_timezone_aware_datetime():
@@ -68,3 +69,32 @@ def test_backtest_options_uses_defaults_and_config_values():
         "exclusive_orders": False,
         "finalize_trades": True,
     }
+
+
+def test_make_backtest_applies_risk_settings():
+    df = pd.DataFrame(
+        {
+            "Open": [100.0] * 40,
+            "High": [101.0] * 40,
+            "Low": [99.0] * 40,
+            "Close": [100.0] * 40,
+            "Volume": [1000.0] * 40,
+        },
+        index=pd.date_range("2024-01-01", periods=40, freq="h"),
+    )
+    settings = {
+        "backtest": {},
+        "trading": {},
+        "risk": {
+            "risk_per_trade": 0.02,
+            "max_position_pct": 0.5,
+            "cooldown_bars": 12,
+        },
+    }
+
+    bt = make_backtest(df, MaCross, settings)
+
+    assert bt._strategy.risk_per_trade == 0.02
+    assert bt._strategy.max_position_pct == 0.5
+    assert bt._strategy.cooldown_bars == 12
+    assert MaCross.risk_per_trade != 0.02

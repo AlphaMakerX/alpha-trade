@@ -38,6 +38,11 @@ risk:
   risk_per_trade: 0.01      # 单笔最多亏损权益比例
   max_position_pct: 1.0     # 单笔最大仓位占权益比例
   max_daily_loss_pct: 0.03  # 单日最大亏损阈值
+  cooldown_losses: 2        # 连续亏损交易次数达到该值后进入冷却
+  cooldown_bars: 24         # 冷却 K线数量
+  max_holding_bars: 120     # 持仓超过该 K线数且未盈利则退出
+  trailing_atr_multiplier: 2.0  # ATR 跟踪止损倍数，<=0 关闭
+  max_drawdown_pct: 0.25    # 账户回撤达到该比例后停止开仓并平仓
 
 # 数据库
 database:
