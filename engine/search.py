@@ -402,6 +402,7 @@ def _test_candidates(
 
 def run_strategy_search(
     strategy_name: str,
+    pair: str,
     timeframe: str,
     start: str,
     end: str,
@@ -413,14 +414,12 @@ def run_strategy_search(
     """Search parameter candidates and rank them by out-of-sample performance."""
     settings = get_settings()
     bt_cfg = settings.get("backtest", {})
-    trading = settings.get("trading", {})
     criteria = criteria or SearchCriteria()
 
     strategy_name = strategy_name or "all"
     timeframe = timeframe or bt_cfg.get("timeframe", "1h")
     start = start or bt_cfg.get("start_date")
     end = end or bt_cfg.get("end_date")
-    pair = trading.get("pair", "ETH/USDT")
 
     df = load_ohlcv(pair, timeframe, start, end)
     if df.empty:

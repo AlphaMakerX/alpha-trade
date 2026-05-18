@@ -13,13 +13,14 @@ def cli():
 
 @cli.command()
 @click.option("--strategy", "-s", required=True, help="策略名称，如 ma_cross")
+@click.option("--pair", "-p", default="ETH/USDT", help="交易对")
 @click.option("--timeframe", "-t", default=None, help="K线周期，如 1h / 4h / 1d")
 @click.option("--start", default=None, help="回测开始日期，如 2024-01-01")
 @click.option("--end", default=None, help="回测结束日期，如 2025-01-01")
 @click.option(
     "--param", "raw_params", multiple=True, help="策略参数覆盖，如 fast_period=40"
 )
-def backtest(strategy, timeframe, start, end, raw_params):
+def backtest(strategy, pair, timeframe, start, end, raw_params):
     """运行策略回测"""
     from engine.backtest import run_backtest
     from engine.params import parse_strategy_params
@@ -34,7 +35,7 @@ def backtest(strategy, timeframe, start, end, raw_params):
     except ValueError as exc:
         click.echo(str(exc))
         return
-    click.echo(run_backtest(strategy, timeframe, start, end, strategy_params))
+    click.echo(run_backtest(strategy, pair, timeframe, start, end, strategy_params))
 
 
 @cli.command()
@@ -56,6 +57,7 @@ def optimize(strategy, timeframe, start, end):
 
 @cli.command("search")
 @click.option("--strategy", "-s", default="all", help="策略名称，或 all 搜索全部策略")
+@click.option("--pair", "-p", default="ETH/USDT", help="交易对")
 @click.option("--timeframe", "-t", default=None, help="K线周期")
 @click.option("--start", default=None, help="开始日期")
 @click.option("--end", default=None, help="结束日期")
@@ -68,6 +70,7 @@ def optimize(strategy, timeframe, start, end):
 @click.option("--min-sharpe", default=0.3, help="最低 Sharpe")
 def search(
     strategy,
+    pair,
     timeframe,
     start,
     end,
@@ -98,6 +101,7 @@ def search(
     click.echo(
         run_strategy_search(
             strategy,
+            pair,
             timeframe,
             start,
             end,
@@ -110,6 +114,7 @@ def search(
 
 @cli.command()
 @click.option("--strategy", "-s", required=True, help="策略名称，如 ma_cross")
+@click.option("--pair", "-p", default="ETH/USDT", help="交易对")
 @click.option("--timeframe", "-t", default=None, help="K线周期")
 @click.option("--start", default=None, help="开始日期")
 @click.option("--end", default=None, help="结束日期")
@@ -118,7 +123,9 @@ def search(
 @click.option(
     "--param", "raw_params", multiple=True, help="固定策略参数，如 fast_period=40"
 )
-def walkforward(strategy, timeframe, start, end, train_months, test_months, raw_params):
+def walkforward(
+    strategy, pair, timeframe, start, end, train_months, test_months, raw_params
+):
     """Walk-Forward 分析：滚动窗口训练+测试，验证参数稳定性"""
     from engine.backtest import run_walk_forward
     from engine.params import parse_strategy_params
@@ -136,6 +143,7 @@ def walkforward(strategy, timeframe, start, end, train_months, test_months, raw_
     click.echo(
         run_walk_forward(
             strategy,
+            pair,
             timeframe,
             start,
             end,
@@ -148,13 +156,14 @@ def walkforward(strategy, timeframe, start, end, train_months, test_months, raw_
 
 @cli.command()
 @click.option("--strategy", "-s", required=True, help="策略名称，如 regime_switch")
+@click.option("--pair", "-p", default="ETH/USDT", help="交易对")
 @click.option("--timeframe", "-t", default=None, help="K线周期")
 @click.option("--start", default=None, help="开始日期，如 2024-01-01")
 @click.option("--end", default=None, help="结束日期，如 2025-01-01")
 @click.option(
     "--param", "raw_params", multiple=True, help="策略参数覆盖，如 fast_period=40"
 )
-def evaluate(strategy, timeframe, start, end, raw_params):
+def evaluate(strategy, pair, timeframe, start, end, raw_params):
     """评估默认参数：全区间、年度/季度分段和成本压力测试"""
     from engine.evaluation import run_strategy_evaluation
     from engine.params import parse_strategy_params
@@ -170,7 +179,7 @@ def evaluate(strategy, timeframe, start, end, raw_params):
         click.echo(str(exc))
         return
     click.echo(
-        run_strategy_evaluation(strategy, timeframe, start, end, strategy_params)
+        run_strategy_evaluation(strategy, pair, timeframe, start, end, strategy_params)
     )
 
 

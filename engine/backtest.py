@@ -26,6 +26,7 @@ def _log_data_quality(data_quality) -> None:
 
 def run_backtest(
     strategy_name: str,
+    pair: str,
     timeframe: str,
     start: str,
     end: str,
@@ -34,14 +35,14 @@ def run_backtest(
     """运行回测，返回格式化的统计结果。"""
     settings = get_settings()
     bt_cfg = settings.get("backtest", {})
-    trading = settings.get("trading", {})
 
     timeframe = timeframe or bt_cfg.get("timeframe", "1h")
     start = start or bt_cfg.get("start_date")
     end = end or bt_cfg.get("end_date")
-    pair = trading.get("pair", "ETH/USDT")
 
-    logger.info(f"开始回测: strategy={strategy_name}, timeframe={timeframe}")
+    logger.info(
+        f"开始回测: strategy={strategy_name}, pair={pair}, timeframe={timeframe}"
+    )
     logger.info(f"回测区间: {start} ~ {end}")
     logger.info(f"初始资金: {bt_cfg.get('initial_capital', 10000)} USDT")
 
@@ -162,6 +163,7 @@ def run_optimize(strategy_name: str, timeframe: str, start: str, end: str) -> st
 
 def run_walk_forward(
     strategy_name: str,
+    pair: str,
     timeframe: str,
     start: str,
     end: str,
@@ -176,7 +178,6 @@ def run_walk_forward(
     timeframe = timeframe or bt_cfg.get("timeframe", "1h")
     start = start or bt_cfg.get("start_date")
     end = end or bt_cfg.get("end_date")
-    pair = settings.get("trading", {}).get("pair", "ETH/USDT")
     strategy_cls = get_strategy(strategy_name)
 
     start_dt = parse_utc_date(start)

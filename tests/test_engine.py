@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 import pandas as pd
 
 from engine.data import load_ohlcv, parse_utc_date
+from engine.backtest import run_backtest
 from engine.evaluation import (
     annual_segments,
     quarterly_segments,
@@ -59,6 +60,32 @@ def test_load_ohlcv_converts_database_columns(monkeypatch):
     assert captured["args"][0:2] == ("ETH/USDT", "1h")
     assert captured["args"][2] == datetime(2024, 1, 1, tzinfo=timezone.utc)
     assert captured["args"][3] == datetime(2024, 1, 2, tzinfo=timezone.utc)
+
+
+def test_run_backtest_uses_explicit_pair(monkeypatch):
+    captured = {}
+
+    def fake_get_settings():
+        return {
+            "backtest": {
+                "timeframe": "1h",
+                "start_date": "2024-01-01",
+                "end_date": "2024-01-02",
+            },
+            "trading": {"pair": "ETH/USDT"},
+        }
+
+    def fake_load_ohlcv(pair, timeframe, start, end):
+        captured["args"] = (pair, timeframe, start, end)
+        return pd.DataFrame()
+
+    monkeypatch.setattr("engine.backtest.get_settings", fake_get_settings)
+    monkeypatch.setattr("engine.backtest.load_ohlcv", fake_load_ohlcv)
+
+    result = run_backtest("ma_cross", "BTC/USDT", "1h", "2024-01-01", "2024-01-02", {})
+
+    assert result == "无数据，请先运行 fetch 拉取数据"
+    assert captured["args"] == ("BTC/USDT", "1h", "2024-01-01", "2024-01-02")
 
 
 def test_backtest_options_uses_defaults_and_config_values():

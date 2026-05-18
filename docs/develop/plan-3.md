@@ -52,23 +52,28 @@
 - [ ] 人工确认 `2023-03-24` Binance 原始缺口处理口径。
   - 缺失：`2023-03-24 13:00:00+00:00`
   - 零成交量：`2023-03-24 12:00:00+00:00`
-- [ ] 支持 CLI 指定交易对，不再只能使用配置中的单一 `ETH/USDT`。
+- [x] 支持 CLI 指定交易对，不再只能使用配置中的单一 `ETH/USDT`。
   - `backtest --pair BTC/USDT`
   - `evaluate --pair BTC/USDT`
   - `search --pair BTC/USDT`
   - `walkforward --pair BTC/USDT`
-- [ ] 批量数据拉取并验证：
+- [x] 批量数据拉取并验证：
   - `BTC/USDT`: `1h`, `4h`
   - `ETH/USDT`: `1h`, `4h`
   - `SOL/USDT`: `1h`, `4h`
   - `BNB/USDT`: `1h`, `4h`
-- [ ] 输出统一数据质量报告，记录每个交易对和周期是否可用于验证。
+- [x] 输出统一数据质量报告，记录每个交易对和周期是否可用于验证。
 
 验收标准：
 
 - 每个待验证交易对/周期都有明确的数据质量状态。
 - 有缺口的数据不能默默进入最终结论。
 - 后续命令不需要修改配置文件就能切换交易对。
+
+执行记录：
+
+- 2026-05-18：`backtest` / `evaluate` / `search` / `walkforward` 已支持 `--pair`，并将指定交易对传入数据加载、数据质量检查和报告输出链路。
+- 2026-05-18：已完成 `BTC/USDT`、`ETH/USDT`、`SOL/USDT`、`BNB/USDT` 的 `1h` / `4h` 批量拉取和质量检查，详见 `docs/develop/data-quality-report-2026-05-18.md`。`4h` 全部 OK；`1h` 均存在同一个 Binance 原始异常点，仍需人工确认处理口径。
 
 ## Phase 2：开发趋势持仓 v3
 

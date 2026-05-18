@@ -242,6 +242,7 @@ def _write_evaluation_report(
 
 def run_strategy_evaluation(
     strategy_name: str,
+    pair: str,
     timeframe: str,
     start: str,
     end: str,
@@ -250,12 +251,10 @@ def run_strategy_evaluation(
     """Evaluate default strategy parameters across segments and cost assumptions."""
     settings = get_settings()
     bt_cfg = settings.get("backtest", {})
-    trading = settings.get("trading", {})
 
     timeframe = timeframe or bt_cfg.get("timeframe", "1h")
     start = start or bt_cfg.get("start_date")
     end = end or bt_cfg.get("end_date")
-    pair = trading.get("pair", "ETH/USDT")
 
     start_dt = parse_utc_date(start)
     end_dt = parse_utc_date(end)
