@@ -3,7 +3,6 @@ from datetime import datetime, timezone
 
 import pandas as pd
 
-
 _TIMEFRAME_FREQ = {
     "1m": "1min",
     "5m": "5min",
@@ -84,7 +83,9 @@ class DataQualityReport:
 def _parse_date(value: str | None) -> pd.Timestamp | None:
     if not value:
         return None
-    return pd.Timestamp(datetime.strptime(value, "%Y-%m-%d").replace(tzinfo=timezone.utc))
+    return pd.Timestamp(
+        datetime.strptime(value, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+    )
 
 
 def _timezone_name(index: pd.Index) -> str:
@@ -92,7 +93,9 @@ def _timezone_name(index: pd.Index) -> str:
     return str(tz) if tz is not None else "naive"
 
 
-def _align_timestamp_to_index(ts: pd.Timestamp | None, index: pd.DatetimeIndex) -> pd.Timestamp | None:
+def _align_timestamp_to_index(
+    ts: pd.Timestamp | None, index: pd.DatetimeIndex
+) -> pd.Timestamp | None:
     if ts is None:
         return None
     index_tz = getattr(index, "tz", None)
@@ -170,6 +173,8 @@ def validate_ohlcv_data(
         warnings.append(f"发现 {non_positive_price_rows} 行价格 <= 0")
     if invalid_ohlc_rows:
         warnings.append(f"发现 {invalid_ohlc_rows} 行 OHLC 关系异常")
+    if non_positive_volume_rows:
+        warnings.append(f"发现 {non_positive_volume_rows} 行成交量 <= 0")
     if requested_start_ts is not None and first_open > requested_start_ts:
         warnings.append(f"首根 K线晚于请求开始时间: {first_open}")
     if requested_end_ts is not None and last_open < requested_end_ts:

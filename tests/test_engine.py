@@ -3,8 +3,22 @@ from datetime import datetime, timezone
 import pandas as pd
 
 from engine.data import load_ohlcv, parse_utc_date
-from engine.evaluation import annual_segments, quarterly_segments, _settings_with_costs, _summary_row
+from engine.evaluation import (
+    annual_segments,
+    quarterly_segments,
+    _settings_with_costs,
+    _summary_row,
+)
 from engine.factory import backtest_options, make_backtest
+from engine.params import format_strategy_params, parse_strategy_params
+from engine.search import (
+    SearchCriteria,
+    _constraint_for_params,
+    _generate_param_combos,
+    _split_train_test,
+    check_criteria,
+    score_stats,
+)
 from strategies.trend.ma_cross import MaCross
 
 
@@ -101,6 +115,25 @@ def test_make_backtest_applies_risk_settings():
     assert MaCross.risk_per_trade != 0.02
 
 
+def test_parse_strategy_params_casts_values_from_strategy_defaults():
+    params = parse_strategy_params(
+        ("fast_period=40", "atr_multiplier=1.5"),
+        MaCross,
+    )
+
+    assert params == {"fast_period": 40, "atr_multiplier": 1.5}
+    assert format_strategy_params(params) == "fast_period=40, atr_multiplier=1.5"
+
+
+def test_parse_strategy_params_rejects_unknown_param():
+    try:
+        parse_strategy_params(("missing=1",), MaCross)
+    except ValueError as exc:
+        assert str(exc) == "未知策略参数: missing"
+    else:
+        raise AssertionError("expected ValueError")
+
+
 def test_evaluation_segments_cover_requested_range():
     start = datetime(2024, 1, 1, tzinfo=timezone.utc)
     end = datetime(2025, 1, 1, tzinfo=timezone.utc)
@@ -127,16 +160,18 @@ def test_evaluation_cost_settings_do_not_mutate_original():
 
 
 def test_evaluation_summary_row_extracts_core_metrics():
-    stats = pd.Series({
-        "Return [%]": 6.0,
-        "Buy & Hold Return [%]": 45.0,
-        "Sharpe Ratio": 0.75,
-        "Max. Drawdown [%]": -4.0,
-        "# Trades": 45,
-        "Win Rate [%]": 44.4,
-        "Profit Factor": 1.34,
-        "Exposure Time [%]": 7.0,
-    })
+    stats = pd.Series(
+        {
+            "Return [%]": 6.0,
+            "Buy & Hold Return [%]": 45.0,
+            "Sharpe Ratio": 0.75,
+            "Max. Drawdown [%]": -4.0,
+            "# Trades": 45,
+            "Win Rate [%]": 44.4,
+            "Profit Factor": 1.34,
+            "Exposure Time [%]": 7.0,
+        }
+    )
     start = datetime(2024, 1, 1, tzinfo=timezone.utc)
     end = datetime(2025, 1, 1, tzinfo=timezone.utc)
 
@@ -156,3 +191,95 @@ def test_evaluation_summary_row_extracts_core_metrics():
     assert row["trades"] == 45
     assert row["start"] == "2024-01-01"
     assert row["end"] == "2025-01-01"
+
+
+def test_search_score_rewards_return_and_penalizes_drawdown():
+    strong = pd.Series(
+        {
+            "Return [%]": 30.0,
+            "Return (Ann.) [%]": 30.0,
+            "Sharpe Ratio": 1.2,
+            "Max. Drawdown [%]": -8.0,
+            "# Trades": 60,
+            "Profit Factor": 1.8,
+        }
+    )
+    weak = pd.Series(
+        {
+            "Return [%]": 18.0,
+            "Return (Ann.) [%]": 18.0,
+            "Sharpe Ratio": 0.4,
+            "Max. Drawdown [%]": -25.0,
+            "# Trades": 60,
+            "Profit Factor": 1.1,
+        }
+    )
+
+    assert score_stats(strong) > score_stats(weak)
+
+
+def test_search_criteria_returns_failure_reasons():
+    criteria = SearchCriteria(
+        min_train_trades=30,
+        min_test_trades=5,
+        max_drawdown_pct=15.0,
+        min_profit_factor=1.1,
+        min_sharpe=0.3,
+    )
+    stats = pd.Series(
+        {
+            "Return (Ann.) [%]": -2.0,
+            "Sharpe Ratio": 0.1,
+            "Max. Drawdown [%]": -20.0,
+            "# Trades": 3,
+            "Profit Factor": 0.8,
+        }
+    )
+
+    passed, reasons = check_criteria(
+        stats, criteria, min_trades=criteria.min_train_trades
+    )
+
+    assert not passed
+    assert "annual_return<=0" in reasons
+    assert "trades<30" in reasons
+    assert "max_dd>15%" in reasons
+    assert "pf<1.1" in reasons
+    assert "sharpe<0.3" in reasons
+
+
+def test_search_param_constraints_filter_invalid_combinations():
+    combos = _generate_param_combos(
+        {
+            "fast_period": [10, 60],
+            "slow_period": [50],
+            "oversold": [40],
+            "exit_rsi": [50],
+            "range_adx_threshold": [18, 28],
+            "trend_adx_threshold": [26],
+        },
+        _constraint_for_params,
+    )
+
+    assert combos == [
+        {
+            "fast_period": 10,
+            "slow_period": 50,
+            "oversold": 40,
+            "exit_rsi": 50,
+            "range_adx_threshold": 18,
+            "trend_adx_threshold": 26,
+        }
+    ]
+
+
+def test_search_split_uses_tail_as_out_of_sample():
+    df = pd.DataFrame(
+        {"Close": range(10)},
+        index=pd.date_range("2024-01-01", periods=10, freq="h"),
+    )
+
+    train_df, test_df = _split_train_test(df, 0.3)
+
+    assert list(train_df["Close"]) == list(range(7))
+    assert list(test_df["Close"]) == [7, 8, 9]

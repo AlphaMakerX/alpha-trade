@@ -12,6 +12,7 @@ from analysis.data_quality import validate_ohlcv_data
 from analysis.report import write_backtest_report
 from engine.data import load_ohlcv, parse_utc_date
 from engine.factory import backtest_options, make_backtest
+from engine.params import format_strategy_params
 from strategies.registry import get_strategy, strategy_registry
 from utils.config import get_settings
 
@@ -23,7 +24,13 @@ def _log_data_quality(data_quality) -> None:
         logger.warning(warning)
 
 
-def run_backtest(strategy_name: str, timeframe: str, start: str, end: str) -> str:
+def run_backtest(
+    strategy_name: str,
+    timeframe: str,
+    start: str,
+    end: str,
+    strategy_params: dict[str, object],
+) -> str:
     """运行回测，返回格式化的统计结果。"""
     settings = get_settings()
     bt_cfg = settings.get("backtest", {})
@@ -46,7 +53,7 @@ def run_backtest(strategy_name: str, timeframe: str, start: str, end: str) -> st
     _log_data_quality(data_quality)
 
     bt = make_backtest(df, get_strategy(strategy_name), settings)
-    stats = bt.run()
+    stats = bt.run(**strategy_params)
     report_paths = write_backtest_report(
         stats=stats,
         strategy_name=strategy_name,
@@ -66,6 +73,8 @@ def run_backtest(strategy_name: str, timeframe: str, start: str, end: str) -> st
         "",
         f"报告已生成: {report_paths.markdown_path}",
     ]
+    if strategy_params:
+        lines.insert(1, f"参数覆盖: {format_strategy_params(strategy_params)}")
     if report_paths.trades_path is not None:
         lines.append(f"交易明细: {report_paths.trades_path}")
     return "\n".join(lines)
@@ -81,7 +90,9 @@ def _generate_param_combos(opt_params: dict, constraint=None) -> list[dict]:
     return combos
 
 
-def _grid_search_with_progress(bt: Backtest, combos: list[dict], label: str = "") -> tuple[dict, pd.Series]:
+def _grid_search_with_progress(
+    bt: Backtest, combos: list[dict], label: str = ""
+) -> tuple[dict, pd.Series]:
     """带进度输出的网格搜索，返回 (最优参数, 最优 stats)。"""
     total = len(combos)
     best_sqn = -math.inf
@@ -128,7 +139,11 @@ def run_optimize(strategy_name: str, timeframe: str, start: str, end: str) -> st
 
     strategy_cls = get_strategy(strategy_name)
     opt_params = strategy_cls.optimize_params()
-    constraint_fn = (lambda c: c["fast_period"] < c["slow_period"]) if "fast_period" in opt_params else None
+    constraint_fn = (
+        (lambda c: c["fast_period"] < c["slow_period"])
+        if "fast_period" in opt_params
+        else None
+    )
     combos = _generate_param_combos(opt_params, constraint_fn)
 
     bt = make_backtest(df, strategy_cls, settings)
@@ -152,6 +167,7 @@ def run_walk_forward(
     end: str,
     train_months: int,
     test_months: int,
+    strategy_params: dict[str, object],
 ) -> str:
     """Walk-Forward 分析：滚动窗口训练+测试。"""
     settings = get_settings()
@@ -173,12 +189,21 @@ def run_walk_forward(
     _log_data_quality(validate_ohlcv_data(df_all, pair, timeframe, start, end))
 
     opt_params = strategy_cls.optimize_params()
-    constraint_fn = (lambda c: c["fast_period"] < c["slow_period"]) if "fast_period" in opt_params else None
+    constraint_fn = (
+        (lambda c: c["fast_period"] < c["slow_period"])
+        if "fast_period" in opt_params
+        else None
+    )
     combos = _generate_param_combos(opt_params, constraint_fn)
 
     def _optimize_and_test(train_df, test_df, win_num, test_label):
-        bt_train = make_backtest(train_df, strategy_cls, settings)
-        best_params, _ = _grid_search_with_progress(bt_train, combos, label=f"窗口{win_num} ")
+        if strategy_params:
+            best_params = strategy_params
+        else:
+            bt_train = make_backtest(train_df, strategy_cls, settings)
+            best_params, _ = _grid_search_with_progress(
+                bt_train, combos, label=f"窗口{win_num} "
+            )
 
         bt_test = make_backtest(test_df, strategy_cls, settings)
         test_stats = bt_test.run(**best_params)
@@ -215,9 +240,11 @@ def run_walk_forward(
             f"测试 {train_end.date()} ~ {test_end.date()}"
         )
 
-        results.append(_optimize_and_test(
-            train_df, test_df, window_num, f"{train_end.date()} ~ {test_end.date()}"
-        ))
+        results.append(
+            _optimize_and_test(
+                train_df, test_df, window_num, f"{train_end.date()} ~ {test_end.date()}"
+            )
+        )
 
         window_start = train_end
         window_num += 1
@@ -234,9 +261,14 @@ def run_walk_forward(
                 f"测试 {train_end.date()} ~ {end_dt.date()}"
             )
 
-            results.append(_optimize_and_test(
-                train_df, test_df, window_num, f"{train_end.date()} ~ {end_dt.date()}"
-            ))
+            results.append(
+                _optimize_and_test(
+                    train_df,
+                    test_df,
+                    window_num,
+                    f"{train_end.date()} ~ {end_dt.date()}",
+                )
+            )
 
     # 格式化输出
     lines = ["\n=== Walk-Forward 分析结果 ===\n"]
@@ -245,8 +277,10 @@ def run_walk_forward(
         p = r["params"]
         param_str = ", ".join(f"{k}={v}" for k, v in p.items())
         lines.append(f"  参数: {param_str}")
-        lines.append(f"  收益: {r['return']:.2f}%  回撤: {r['max_dd']:.2f}%  "
-                      f"交易: {r['trades']}  胜率: {r['win_rate']:.1f}%  SQN: {r['sqn']:.2f}")
+        lines.append(
+            f"  收益: {r['return']:.2f}%  回撤: {r['max_dd']:.2f}%  "
+            f"交易: {r['trades']}  胜率: {r['win_rate']:.1f}%  SQN: {r['sqn']:.2f}"
+        )
         lines.append("")
 
     # 汇总

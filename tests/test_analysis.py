@@ -33,6 +33,17 @@ def test_validate_ohlcv_data_detects_missing_bars():
     assert not report.ok
 
 
+def test_validate_ohlcv_data_warns_on_non_positive_volume():
+    df = _make_ohlcv(pd.date_range("2024-01-01", periods=2, freq="h"))
+    df.loc[df.index[0], "Volume"] = 0.0
+
+    report = validate_ohlcv_data(df, "ETH/USDT", "1h", "2024-01-01", "2024-01-01")
+
+    assert report.non_positive_volume_rows == 1
+    assert "发现 1 行成交量 <= 0" in report.warnings
+    assert not report.ok
+
+
 def test_write_backtest_report_creates_markdown_and_trades(tmp_path, monkeypatch):
     trades = pd.DataFrame(
         {

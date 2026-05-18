@@ -7,7 +7,6 @@ import pandas as pd
 
 from analysis.data_quality import DataQualityReport
 
-
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 _REPORT_DIR = _PROJECT_ROOT / "artifacts" / "backtests"
 
@@ -104,7 +103,7 @@ def write_backtest_report(
     """Persist a compact Markdown report and the trade list for one backtest."""
     _REPORT_DIR.mkdir(parents=True, exist_ok=True)
 
-    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S-%f")
     base_name = _safe_name(
         f"{timestamp}_{strategy_name}_{pair}_{timeframe}_{start or 'na'}_{end or 'na'}"
     )

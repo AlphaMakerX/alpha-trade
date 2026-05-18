@@ -9,9 +9,9 @@ from dateutil.relativedelta import relativedelta
 from analysis.data_quality import validate_ohlcv_data
 from engine.data import load_ohlcv, parse_utc_date
 from engine.factory import make_backtest
+from engine.params import format_strategy_params
 from strategies.registry import get_strategy
 from utils.config import get_settings
-
 
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 _REPORT_DIR = _PROJECT_ROOT / "artifacts" / "evaluations"
@@ -48,7 +48,9 @@ class EvaluationReportPaths:
     summary_path: Path
 
 
-def _segments(start: datetime, end: datetime, months: int, prefix: str) -> list[EvaluationSegment]:
+def _segments(
+    start: datetime, end: datetime, months: int, prefix: str
+) -> list[EvaluationSegment]:
     current = start
     result = []
     index = 1
@@ -128,12 +130,13 @@ def _run_row(
     df: pd.DataFrame,
     strategy_cls,
     settings: dict,
+    strategy_params: dict[str, object],
     group: str,
     label: str,
     start: datetime,
     end: datetime,
 ) -> dict:
-    stats = make_backtest(df, strategy_cls, settings).run()
+    stats = make_backtest(df, strategy_cls, settings).run(**strategy_params)
     trading = settings.get("trading", {})
     return _summary_row(
         group=group,
@@ -166,7 +169,11 @@ def _markdown_table(rows: list[dict], columns: list[str]) -> str:
         "| " + " | ".join("---" for _ in columns) + " |",
     ]
     for row in rows:
-        lines.append("| " + " | ".join(_format_value(row.get(column)) for column in columns) + " |")
+        lines.append(
+            "| "
+            + " | ".join(_format_value(row.get(column)) for column in columns)
+            + " |"
+        )
     return "\n".join(lines)
 
 
@@ -178,10 +185,11 @@ def _write_evaluation_report(
     start: str,
     end: str,
     data_quality,
+    strategy_params: dict[str, object],
     rows: list[dict],
 ) -> EvaluationReportPaths:
     _REPORT_DIR.mkdir(parents=True, exist_ok=True)
-    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S-%f")
     safe_pair = pair.replace("/", "-")
     base_name = f"{timestamp}_{strategy_name}_{safe_pair}_{timeframe}_{start}_{end}"
     markdown_path = _REPORT_DIR / f"{base_name}.md"
@@ -203,6 +211,7 @@ def _write_evaluation_report(
         f"- Pair: `{pair}`",
         f"- Timeframe: `{timeframe}`",
         f"- Range: `{start}` ~ `{end}`",
+        f"- Param overrides: `{format_strategy_params(strategy_params)}`",
         f"- Generated at: `{timestamp}`",
         "- Cash benchmark: `0%`",
         "",
@@ -231,7 +240,13 @@ def _write_evaluation_report(
     return EvaluationReportPaths(markdown_path=markdown_path, summary_path=summary_path)
 
 
-def run_strategy_evaluation(strategy_name: str, timeframe: str, start: str, end: str) -> str:
+def run_strategy_evaluation(
+    strategy_name: str,
+    timeframe: str,
+    start: str,
+    end: str,
+    strategy_params: dict[str, object],
+) -> str:
     """Evaluate default strategy parameters across segments and cost assumptions."""
     settings = get_settings()
     bt_cfg = settings.get("backtest", {})
@@ -259,6 +274,7 @@ def run_strategy_evaluation(strategy_name: str, timeframe: str, start: str, end:
             df=df,
             strategy_cls=strategy_cls,
             settings=settings,
+            strategy_params=strategy_params,
             group="full",
             label="full",
             start=start_dt,
@@ -275,6 +291,7 @@ def run_strategy_evaluation(strategy_name: str, timeframe: str, start: str, end:
                 df=segment_df,
                 strategy_cls=strategy_cls,
                 settings=settings,
+                strategy_params=strategy_params,
                 group="annual",
                 label=segment.label,
                 start=segment.start,
@@ -291,6 +308,7 @@ def run_strategy_evaluation(strategy_name: str, timeframe: str, start: str, end:
                 df=segment_df,
                 strategy_cls=strategy_cls,
                 settings=settings,
+                strategy_params=strategy_params,
                 group="quarterly",
                 label=segment.label,
                 start=segment.start,
@@ -306,6 +324,7 @@ def run_strategy_evaluation(strategy_name: str, timeframe: str, start: str, end:
                     df=df,
                     strategy_cls=strategy_cls,
                     settings=cost_settings,
+                    strategy_params=strategy_params,
                     group="cost",
                     label=f"commission={commission:.4f}, slippage={slippage:.4f}",
                     start=start_dt,
@@ -320,6 +339,7 @@ def run_strategy_evaluation(strategy_name: str, timeframe: str, start: str, end:
         start=start,
         end=end,
         data_quality=data_quality,
+        strategy_params=strategy_params,
         rows=rows,
     )
 
@@ -339,6 +359,11 @@ def run_strategy_evaluation(strategy_name: str, timeframe: str, start: str, end:
     return "\n".join(
         [
             "=== 策略稳定性评估 ===",
+            (
+                f"参数覆盖: {format_strategy_params(strategy_params)}"
+                if strategy_params
+                else "参数覆盖: 无"
+            ),
             selected.to_string(index=False),
             "",
             "=== 数据质量 ===",

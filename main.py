@@ -16,16 +16,25 @@ def cli():
 @click.option("--timeframe", "-t", default=None, help="K线周期，如 1h / 4h / 1d")
 @click.option("--start", default=None, help="回测开始日期，如 2024-01-01")
 @click.option("--end", default=None, help="回测结束日期，如 2025-01-01")
-def backtest(strategy, timeframe, start, end):
+@click.option(
+    "--param", "raw_params", multiple=True, help="策略参数覆盖，如 fast_period=40"
+)
+def backtest(strategy, timeframe, start, end, raw_params):
     """运行策略回测"""
     from engine.backtest import run_backtest
-    from strategies.registry import list_strategies
+    from engine.params import parse_strategy_params
+    from strategies.registry import get_strategy, list_strategies
 
     strategies = list_strategies()
     if strategy not in strategies:
         click.echo(f"未知策略: {strategy}，可选: {', '.join(strategies)}")
         return
-    click.echo(run_backtest(strategy, timeframe, start, end))
+    try:
+        strategy_params = parse_strategy_params(raw_params, get_strategy(strategy))
+    except ValueError as exc:
+        click.echo(str(exc))
+        return
+    click.echo(run_backtest(strategy, timeframe, start, end, strategy_params))
 
 
 @cli.command()
@@ -45,6 +54,60 @@ def optimize(strategy, timeframe, start, end):
     click.echo(run_optimize(strategy, timeframe, start, end))
 
 
+@cli.command("search")
+@click.option("--strategy", "-s", default="all", help="策略名称，或 all 搜索全部策略")
+@click.option("--timeframe", "-t", default=None, help="K线周期")
+@click.option("--start", default=None, help="开始日期")
+@click.option("--end", default=None, help="结束日期")
+@click.option("--top", default=20, help="输出前 N 个候选")
+@click.option("--oos-ratio", default=0.33, help="尾部样本外数据比例")
+@click.option("--min-train-trades", default=30, help="训练段最少交易数")
+@click.option("--min-test-trades", default=5, help="样本外最少交易数")
+@click.option("--max-drawdown", default=15.0, help="最大回撤绝对值上限，百分比")
+@click.option("--min-profit-factor", default=1.1, help="最低 Profit Factor")
+@click.option("--min-sharpe", default=0.3, help="最低 Sharpe")
+def search(
+    strategy,
+    timeframe,
+    start,
+    end,
+    top,
+    oos_ratio,
+    min_train_trades,
+    min_test_trades,
+    max_drawdown,
+    min_profit_factor,
+    min_sharpe,
+):
+    """搜索并排序策略参数候选，训练段优化，尾部样本外验证。"""
+    from engine.search import SearchCriteria, run_strategy_search
+    from strategies.registry import list_strategies
+
+    strategies = list_strategies()
+    if strategy != "all" and strategy not in strategies:
+        click.echo(f"未知策略: {strategy}，可选: all, {', '.join(strategies)}")
+        return
+
+    criteria = SearchCriteria(
+        min_train_trades=min_train_trades,
+        min_test_trades=min_test_trades,
+        max_drawdown_pct=max_drawdown,
+        min_profit_factor=min_profit_factor,
+        min_sharpe=min_sharpe,
+    )
+    click.echo(
+        run_strategy_search(
+            strategy,
+            timeframe,
+            start,
+            end,
+            top=top,
+            oos_ratio=oos_ratio,
+            criteria=criteria,
+        )
+    )
+
+
 @cli.command()
 @click.option("--strategy", "-s", required=True, help="策略名称，如 ma_cross")
 @click.option("--timeframe", "-t", default=None, help="K线周期")
@@ -52,16 +115,35 @@ def optimize(strategy, timeframe, start, end):
 @click.option("--end", default=None, help="结束日期")
 @click.option("--train-months", default=12, help="训练窗口月数")
 @click.option("--test-months", default=6, help="测试窗口月数")
-def walkforward(strategy, timeframe, start, end, train_months, test_months):
+@click.option(
+    "--param", "raw_params", multiple=True, help="固定策略参数，如 fast_period=40"
+)
+def walkforward(strategy, timeframe, start, end, train_months, test_months, raw_params):
     """Walk-Forward 分析：滚动窗口训练+测试，验证参数稳定性"""
     from engine.backtest import run_walk_forward
-    from strategies.registry import list_strategies
+    from engine.params import parse_strategy_params
+    from strategies.registry import get_strategy, list_strategies
 
     strategies = list_strategies()
     if strategy not in strategies:
         click.echo(f"未知策略: {strategy}，可选: {', '.join(strategies)}")
         return
-    click.echo(run_walk_forward(strategy, timeframe, start, end, train_months, test_months))
+    try:
+        strategy_params = parse_strategy_params(raw_params, get_strategy(strategy))
+    except ValueError as exc:
+        click.echo(str(exc))
+        return
+    click.echo(
+        run_walk_forward(
+            strategy,
+            timeframe,
+            start,
+            end,
+            train_months,
+            test_months,
+            strategy_params,
+        )
+    )
 
 
 @cli.command()
@@ -69,16 +151,27 @@ def walkforward(strategy, timeframe, start, end, train_months, test_months):
 @click.option("--timeframe", "-t", default=None, help="K线周期")
 @click.option("--start", default=None, help="开始日期，如 2024-01-01")
 @click.option("--end", default=None, help="结束日期，如 2025-01-01")
-def evaluate(strategy, timeframe, start, end):
+@click.option(
+    "--param", "raw_params", multiple=True, help="策略参数覆盖，如 fast_period=40"
+)
+def evaluate(strategy, timeframe, start, end, raw_params):
     """评估默认参数：全区间、年度/季度分段和成本压力测试"""
     from engine.evaluation import run_strategy_evaluation
-    from strategies.registry import list_strategies
+    from engine.params import parse_strategy_params
+    from strategies.registry import get_strategy, list_strategies
 
     strategies = list_strategies()
     if strategy not in strategies:
         click.echo(f"未知策略: {strategy}，可选: {', '.join(strategies)}")
         return
-    click.echo(run_strategy_evaluation(strategy, timeframe, start, end))
+    try:
+        strategy_params = parse_strategy_params(raw_params, get_strategy(strategy))
+    except ValueError as exc:
+        click.echo(str(exc))
+        return
+    click.echo(
+        run_strategy_evaluation(strategy, timeframe, start, end, strategy_params)
+    )
 
 
 @cli.command()
@@ -124,7 +217,9 @@ def fetch(pair, timeframe, start, end):
     from data.feeds.binance import fetch_all_klines
 
     start_dt = datetime.strptime(start, "%Y-%m-%d").replace(tzinfo=timezone.utc)
-    end_dt = datetime.strptime(end, "%Y-%m-%d").replace(tzinfo=timezone.utc) if end else None
+    end_dt = (
+        datetime.strptime(end, "%Y-%m-%d").replace(tzinfo=timezone.utc) if end else None
+    )
 
     logger.info(f"开始拉取: {pair} {timeframe} from {start} to {end or 'now'}")
     total = fetch_all_klines(pair, timeframe, start_dt, end_dt)

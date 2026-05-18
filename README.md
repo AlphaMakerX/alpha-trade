@@ -92,6 +92,12 @@ cp config/settings.example.yaml config/settings.yaml
 .venv/bin/python main.py backtest -s regime_switch -t 1h --start 2024-01-01 --end 2025-01-01
 ```
 
+复测候选参数：
+
+```bash
+.venv/bin/python main.py evaluate -s ma_cross -t 1h --start 2023-01-01 --end 2026-05-14 --param fast_period=40 --param slow_period=50 --param trend_period=200 --param atr_period=20 --param atr_multiplier=1.5
+```
+
 稳定性评估：
 
 ```bash
@@ -103,6 +109,14 @@ cp config/settings.example.yaml config/settings.yaml
 ```bash
 .venv/bin/python main.py optimize -s regime_switch -t 1h --start 2024-01-01 --end 2025-01-01
 ```
+
+候选搜索：
+
+```bash
+.venv/bin/python main.py search -s all -t 1h --start 2023-01-01 --end 2026-01-01 --top 20
+```
+
+`search` 会先用前段数据训练和筛选参数，再用尾部样本外数据排序候选。它适合用来找“值得继续验证”的高年化候选，但不能把单次搜索结果直接当实盘策略。
 
 Walk-forward：
 
