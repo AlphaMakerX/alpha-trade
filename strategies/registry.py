@@ -4,7 +4,7 @@ from strategies.mean_revert.bollinger_revert import BollingerRevert
 from strategies.mean_revert.rsi_revert import RsiRevert
 from strategies.trend.ma_cross import MaCross
 from strategies.trend.trend_breakout import TrendBreakout
-
+from strategies.trend.trend_holding_v3 import TrendHoldingV3
 
 _STRATEGIES: dict[str, type[BaseStrategy]] = {
     "bollinger_revert": BollingerRevert,
@@ -12,6 +12,7 @@ _STRATEGIES: dict[str, type[BaseStrategy]] = {
     "regime_switch": RegimeSwitch,
     "rsi_revert": RsiRevert,
     "trend_breakout": TrendBreakout,
+    "trend_holding_v3": TrendHoldingV3,
 }
 
 

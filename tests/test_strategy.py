@@ -6,6 +6,7 @@ from strategies.composite.regime_switch import RegimeSwitch
 from strategies.registry import get_strategy, list_strategies
 from strategies.trend.ma_cross import MaCross
 from strategies.trend.trend_breakout import TrendBreakout
+from strategies.trend.trend_holding_v3 import TrendHoldingV3
 from strategies.mean_revert.bollinger_revert import BollingerRevert
 from strategies.mean_revert.rsi_revert import RsiRevert
 
@@ -116,12 +117,14 @@ def test_strategy_registry_lists_available_strategies():
         "regime_switch",
         "rsi_revert",
         "trend_breakout",
+        "trend_holding_v3",
     ]
     assert get_strategy("bollinger_revert") is BollingerRevert
     assert get_strategy("ma_cross") is MaCross
     assert get_strategy("regime_switch") is RegimeSwitch
     assert get_strategy("rsi_revert") is RsiRevert
     assert get_strategy("trend_breakout") is TrendBreakout
+    assert get_strategy("trend_holding_v3") is TrendHoldingV3
 
 
 def test_strategy_registry_rejects_unknown_strategy():
@@ -172,6 +175,34 @@ def test_trend_breakout_buys_on_confirmed_breakout():
         volume_multiplier=0.0,
         max_holding_bars=0,
         trailing_atr_multiplier=2.0,
+        max_drawdown_pct=0,
+    )
+
+    assert stats["# Trades"] > 0
+
+
+def test_trend_holding_v3_buys_and_holds_breakout():
+    prices = [100.0 + i * 0.05 for i in range(80)]
+    prices += [104.0 + i * 1.5 for i in range(40)]
+    prices += [prices[-1] - i * 0.5 for i in range(1, 20)]
+
+    df = _make_ohlcv(prices)
+    bt = Backtest(
+        df, TrendHoldingV3, cash=10000, commission=0.001, finalize_trades=True
+    )
+    stats = bt.run(
+        trend_period=20,
+        trend_slope_period=3,
+        breakout_period=10,
+        pullback_period=5,
+        exit_period=10,
+        atr_period=5,
+        atr_multiplier=3.0,
+        atr_percentile_period=20,
+        min_atr_percentile=0.0,
+        max_atr_percentile=1.0,
+        max_holding_bars=0,
+        trailing_atr_multiplier=3.0,
         max_drawdown_pct=0,
     )
 
