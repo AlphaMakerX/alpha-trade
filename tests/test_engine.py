@@ -2,7 +2,12 @@ from datetime import datetime, timezone
 
 import pandas as pd
 
-from engine.data import load_ohlcv, parse_utc_date
+from engine.data import (
+    HIGHER_TIMEFRAME_CLOSE_COLUMN,
+    HIGHER_TIMEFRAME_TREND_EMA_COLUMN,
+    load_ohlcv,
+    parse_utc_date,
+)
 from engine.backtest import run_backtest
 from engine.evaluation import (
     annual_segments,
@@ -42,11 +47,13 @@ def test_load_ohlcv_converts_database_columns(monkeypatch):
             "volume": [10.0, 11.0],
         }
     )
-    captured = {}
+    captured = []
 
     def fake_query_klines(pair, timeframe, start, end):
-        captured["args"] = (pair, timeframe, start, end)
-        return raw
+        captured.append((pair, timeframe, start, end))
+        if timeframe == "1h":
+            return raw
+        return pd.DataFrame()
 
     monkeypatch.setattr("engine.data.query_klines", fake_query_klines)
 
@@ -57,9 +64,44 @@ def test_load_ohlcv_converts_database_columns(monkeypatch):
         datetime(2024, 1, 1, 0, tzinfo=timezone.utc),
         datetime(2024, 1, 1, 1, tzinfo=timezone.utc),
     ]
-    assert captured["args"][0:2] == ("ETH/USDT", "1h")
-    assert captured["args"][2] == datetime(2024, 1, 1, tzinfo=timezone.utc)
-    assert captured["args"][3] == datetime(2024, 1, 2, tzinfo=timezone.utc)
+    assert captured[0][0:2] == ("ETH/USDT", "1h")
+    assert captured[0][2] == datetime(2024, 1, 1, tzinfo=timezone.utc)
+    assert captured[0][3] == datetime(2024, 1, 2, tzinfo=timezone.utc)
+
+
+def test_load_ohlcv_appends_higher_timeframe_columns(monkeypatch):
+    raw = pd.DataFrame(
+        {
+            "open_time": pd.date_range(
+                "2024-01-01", periods=240, freq="h", tz=timezone.utc
+            ),
+            "open": [100.0] * 240,
+            "high": [101.0] * 240,
+            "low": [99.0] * 240,
+            "close": [100.0 + index * 0.1 for index in range(240)],
+            "volume": [10.0] * 240,
+        }
+    )
+    higher = pd.DataFrame(
+        {
+            "open_time": pd.date_range(
+                "2024-01-01", periods=220, freq="4h", tz=timezone.utc
+            ),
+            "close": [100.0 + index * 0.2 for index in range(220)],
+        }
+    )
+
+    def fake_query_klines(pair, timeframe, start, end):
+        if timeframe == "1h":
+            return raw
+        return higher
+
+    monkeypatch.setattr("engine.data.query_klines", fake_query_klines)
+
+    df = load_ohlcv("ETH/USDT", "1h", "2024-01-01", "2024-01-11")
+
+    assert HIGHER_TIMEFRAME_CLOSE_COLUMN in df.columns
+    assert HIGHER_TIMEFRAME_TREND_EMA_COLUMN in df.columns
 
 
 def test_run_backtest_uses_explicit_pair(monkeypatch):

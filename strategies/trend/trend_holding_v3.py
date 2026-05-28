@@ -4,6 +4,10 @@ import pandas as pd
 from ta.trend import EMAIndicator
 from ta.volatility import AverageTrueRange
 
+from engine.data import (
+    HIGHER_TIMEFRAME_CLOSE_COLUMN,
+    HIGHER_TIMEFRAME_TREND_EMA_COLUMN,
+)
 from strategies.base import BaseStrategy
 
 
@@ -22,6 +26,10 @@ class TrendHoldingV3(BaseStrategy):
     atr_percentile_period = 200
     min_atr_percentile = 0.30
     max_atr_percentile = 0.95
+    use_breakout_entry = True
+    use_pullback_entry = True
+    use_higher_timeframe_filter = False
+    higher_timeframe_slope_bars = 24
     max_holding_bars = 0
     trailing_atr_multiplier = 3.0
 
@@ -89,6 +97,8 @@ class TrendHoldingV3(BaseStrategy):
             .rolling(self.atr_percentile_period)
             .rank(pct=True),
         )
+        if self.use_higher_timeframe_filter:
+            self._init_higher_timeframe_filter()
 
     @staticmethod
     def _finite(*values) -> bool:
@@ -116,6 +126,36 @@ class TrendHoldingV3(BaseStrategy):
             and self.min_atr_percentile <= percentile <= self.max_atr_percentile
         )
 
+    def _init_higher_timeframe_filter(self):
+        columns = self.data.df.columns
+        missing_columns = [
+            column
+            for column in (
+                HIGHER_TIMEFRAME_CLOSE_COLUMN,
+                HIGHER_TIMEFRAME_TREND_EMA_COLUMN,
+            )
+            if column not in columns
+        ]
+        if missing_columns:
+            joined = ", ".join(missing_columns)
+            raise ValueError(f"缺少高周期过滤数据列: {joined}")
+
+        self.higher_timeframe_close = self.I(
+            lambda: self.data.df[HIGHER_TIMEFRAME_CLOSE_COLUMN],
+        )
+        self.higher_timeframe_trend_ema = self.I(
+            lambda: self.data.df[HIGHER_TIMEFRAME_TREND_EMA_COLUMN],
+        )
+
+    def _higher_timeframe_confirmed(self) -> bool:
+        if not self.use_higher_timeframe_filter:
+            return True
+
+        close = self.higher_timeframe_close[-1]
+        ema_now = self.higher_timeframe_trend_ema[-1]
+        ema_then = self.higher_timeframe_trend_ema[-self.higher_timeframe_slope_bars]
+        return self._finite(close, ema_now, ema_then) and close > ema_now > ema_then
+
     def _entry_signal(self, price: float) -> bool:
         # 第 8 步：在已确认的趋势里，等待突破前高或回踩重站信号。
         if not self._finite(
@@ -134,7 +174,9 @@ class TrendHoldingV3(BaseStrategy):
             and price > self.pullback_ema[-1]
             and price > self.data.High[-2]
         )
-        return breakout or pullback_reclaim
+        return (self.use_breakout_entry and breakout) or (
+            self.use_pullback_entry and pullback_reclaim
+        )
 
     def _exit_signal(self, price: float) -> bool:
         # 第 9 步：趋势结构破坏时退出，不等慢速均线交叉确认后才卖。
@@ -174,6 +216,7 @@ class TrendHoldingV3(BaseStrategy):
         # 初始止损距离会参与仓位计算。
         if (
             self._trend_confirmed(price)
+            and self._higher_timeframe_confirmed()
             and self._volatility_allowed()
             and self._entry_signal(price)
         ):
