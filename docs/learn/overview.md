@@ -29,6 +29,7 @@
 | Day 1 | 如何找到一个能盈利的策略 | 已完成 |
 | Day 2 | `rsi_revert`：RSI 超跌反弹策略 | 已完成 |
 | Day 3 | `bollinger_revert`：Bollinger + RSI 均值回归 | 已完成 |
+| Day 4 | `trend_holding_v3`：从均值回归到趋势持仓 | 已完成 |
 
 ## 后续候选策略
 
