@@ -204,6 +204,19 @@ def analyze(pair, timeframe, date):
     click.echo(run_analyze(pair, timeframe, date))
 
 
+@cli.command("bias-eval")
+@click.option("--pair", "-p", default="ETH/USDT", help="交易对")
+@click.option("--start", default=None, help="开始日期，如 2023-01-01")
+@click.option("--end", default=None, help="结束日期")
+@click.option("--horizons", default="24,72,120", help="前瞻根数，逗号分隔，如 24,72,120")
+def bias_eval(pair, start, end, horizons):
+    """回测 bias 倾向信号：统计每根 K线倾向之后 N 根的真实涨跌，检验有无预测力"""
+    from analysis.bias_eval import evaluate_bias, format_eval
+
+    hs = [int(x) for x in horizons.split(",") if x.strip()]
+    click.echo(format_eval(evaluate_bias(pair, start, end, hs)))
+
+
 @cli.command()
 def info():
     """显示当前配置信息"""
