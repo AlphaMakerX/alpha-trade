@@ -196,11 +196,12 @@ def signal(pair, timeframe):
 @cli.command()
 @click.option("--pair", "-p", default="ETH/USDT", help="交易对")
 @click.option("--timeframe", "-t", default="1h", help="K线周期")
-def analyze(pair, timeframe):
-    """读 DB 行情，规则定倾向 + LLM 解读当前走势（仅描述，非买卖建议）"""
+@click.option("--date", "-d", default=None, help="分析截至日期，如 2026-06-01，默认最新")
+def analyze(pair, timeframe, date):
+    """读 DB 行情，规则定倾向 + LLM 解读走势（仅描述，非买卖建议），并存为 md 报告"""
     from engine.analyst import analyze as run_analyze
 
-    click.echo(run_analyze(pair, timeframe))
+    click.echo(run_analyze(pair, timeframe, date))
 
 
 @cli.command()

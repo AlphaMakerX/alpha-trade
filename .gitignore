@@ -153,6 +153,9 @@ logs/
 # Generated backtest reports
 artifacts/
 
+# Generated analyze reports
+reports/
+
 # Config with secrets (use settings.example.yaml as template)
 config/settings.yaml
 
