@@ -194,6 +194,16 @@ def signal(pair, timeframe):
 
 
 @cli.command()
+@click.option("--pair", "-p", default="ETH/USDT", help="交易对")
+@click.option("--timeframe", "-t", default="1h", help="K线周期")
+def analyze(pair, timeframe):
+    """读 DB 行情，规则定倾向 + LLM 解读当前走势（仅描述，非买卖建议）"""
+    from engine.analyst import analyze as run_analyze
+
+    click.echo(run_analyze(pair, timeframe))
+
+
+@cli.command()
 def info():
     """显示当前配置信息"""
     settings = get_settings()

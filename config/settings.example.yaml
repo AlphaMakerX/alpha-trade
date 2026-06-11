@@ -44,6 +44,13 @@ risk:
   trailing_atr_multiplier: 2.0  # ATR 跟踪止损倍数，<=0 关闭
   max_drawdown_pct: 0.25    # 账户回撤达到该比例后停止开仓并平仓
 
+# LLM 看盘解读（OpenAI 兼容接口）
+llm:
+  base_url: https://gw-internal.aiflow.certik.com/v1
+  api_key: ${OPENAI_API_KEY}
+  model: ${LLM_MODEL}   # gateway 实际模型名，在 .env 设置
+  temperature: 0.3
+
 # 数据库
 database:
   host: localhost

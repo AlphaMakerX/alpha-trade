@@ -20,6 +20,7 @@ dependencies = [
     "loguru>=0.7",
     "python-dotenv>=1.0",
     "sqlalchemy>=2.0",
+    "openai>=1.0",
 ]
 
 [project.optional-dependencies]
