@@ -26,7 +26,7 @@ class TrendHoldingV3(BaseStrategy):
     atr_percentile_period = 200
     min_atr_percentile = 0.30
     max_atr_percentile = 0.95
-    use_breakout_entry = True
+    use_breakout_entry = False
     use_pullback_entry = True
     use_higher_timeframe_filter = False
     higher_timeframe_slope_bars = 24

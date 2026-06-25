@@ -201,6 +201,7 @@ def test_trend_holding_v3_buys_and_holds_breakout():
         atr_percentile_period=20,
         min_atr_percentile=0.0,
         max_atr_percentile=1.0,
+        use_breakout_entry=True,
         max_holding_bars=0,
         trailing_atr_multiplier=3.0,
         max_drawdown_pct=0,
