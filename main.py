@@ -193,6 +193,16 @@ def signal(pair, timeframe):
     click.echo(get_signal(pair, timeframe))
 
 
+@cli.command("best-signal")
+@click.option("--pair", "-p", default="ETH/USDT", help="交易对")
+@click.option("--timeframe", "-t", default="1h", help="K线周期")
+def best_signal(pair, timeframe):
+    """用最优策略 trend_holding_v3 判断当前是否触发买卖点"""
+    from engine.signal import get_best_signal
+
+    click.echo(get_best_signal(pair, timeframe))
+
+
 @cli.command()
 @click.option("--pair", "-p", default="ETH/USDT", help="交易对")
 @click.option("--timeframe", "-t", default="1h", help="K线周期")

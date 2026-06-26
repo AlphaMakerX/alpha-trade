@@ -6,6 +6,7 @@ from openai import OpenAI
 
 from data.storage.postgres import query_klines
 from engine.data import HIGHER_TIMEFRAME, parse_utc_date
+from engine.strategy_signal import StrategySignal, evaluate_trend_holding_v3
 from indicators.bias import BiasResult, classify_bias
 from indicators.snapshot import MA_SLOW_PERIOD, Snapshot, compute_snapshot
 from utils.config import get_settings
@@ -95,7 +96,35 @@ def _ask_llm(s: Snapshot, bias: BiasResult, cfg: dict) -> str:
     return resp.choices[0].message.content.strip()
 
 
-def _render_markdown(s: Snapshot, bias: BiasResult, model: str, explanation: str) -> str:
+def _render_strategy_signal(sig: StrategySignal) -> str:
+    conclusion = sig.verdict
+    entry = "\n".join(
+        f"| {r.name} | {'✅' if r.passed else '❌'} | {r.detail} |" for r in sig.entry_rows
+    )
+    exit_ = "\n".join(
+        f"| {r.name} | {'✅' if r.passed else '❌'} | {r.detail} |" for r in sig.exit_rows
+    )
+    return f"""## 策略信号：{sig.strategy}
+
+**结论：{conclusion}**
+
+买入（开多）条件：
+
+| 条件 | 满足 | 说明 |
+|---|---|---|
+{entry}
+
+卖出/平仓条件（仅持仓时有效）：
+
+| 条件 | 满足 | 说明 |
+|---|---|---|
+{exit_}
+"""
+
+
+def _render_markdown(
+    s: Snapshot, bias: BiasResult, sig: StrategySignal, model: str, explanation: str
+) -> str:
     higher = (
         f"{s.higher_close:.2f}（EMA200 {s.higher_trend_ema:.2f}）"
         if s.higher_trend_ema is not None
@@ -136,6 +165,7 @@ def _render_markdown(s: Snapshot, bias: BiasResult, model: str, explanation: str
 
 {risks}
 
+{_render_strategy_signal(sig)}
 ## AI 解读（仅描述现状，非买卖建议）
 
 {explanation}
@@ -167,9 +197,10 @@ def analyze(pair: str, timeframe: str, end: str | None) -> str:
 
     snapshot = compute_snapshot(base_df, higher_df, pair, timeframe)
     bias = classify_bias(snapshot)
+    signal = evaluate_trend_holding_v3(base_df)
     cfg = _llm_config()
     explanation = _ask_llm(snapshot, bias, cfg)
 
-    markdown = _render_markdown(snapshot, bias, cfg["model"], explanation)
+    markdown = _render_markdown(snapshot, bias, signal, cfg["model"], explanation)
     _save_report(markdown, snapshot)
     return markdown

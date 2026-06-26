@@ -34,8 +34,9 @@
 | `optimize` | 网格搜索参数（仅候选，不能直接上线） | — |
 | `walkforward` | 样本外验证，识别过拟合 | — |
 | `search` | 候选粗筛（训练段遍历 + 尾部样本外复测） | `artifacts/searches/` |
-| `signal` | 输出当前买卖信号 | — |
-| `analyze` | 规则定倾向 + LLM 看盘解读 | `reports/` |
+| `best-signal` | 用最优策略 trend_holding_v3 判断当前买卖点（实时、只看闭合 K 线） | — |
+| `signal` | ma_cross 旧基线买卖信号（对照） | — |
+| `analyze` | 规则定倾向 + 策略买卖点 + LLM 看盘解读 | `reports/` |
 
 示例：
 
