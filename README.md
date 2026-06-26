@@ -163,6 +163,8 @@ artifacts/evaluations/
 
 ## 文档
 
-- [策略开发与实盘使用流程](docs/architecture.md)
-- [优化计划 v2](docs/develop/plan-2.md)
-- [目录结构](docs/project-structure.md)
+- [文档总览](docs/overview.md)
+- [架构总览](docs/architecture/overview.md)
+- [策略开发与实盘流程](docs/architecture/workflow.md)
+- [目录结构](docs/architecture/project-structure.md)
+- [核心概念](docs/concept/overview.md)
