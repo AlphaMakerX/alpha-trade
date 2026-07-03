@@ -227,6 +227,25 @@ def bias_eval(pair, start, end, horizons):
     click.echo(format_eval(evaluate_bias(pair, start, end, hs)))
 
 
+@cli.command("momentum-eval")
+@click.option("--pair", "-p", default="ETH/USDT", help="交易对")
+@click.option("--start", default=None, help="开始日期，如 2023-01-01")
+@click.option("--end", default=None, help="结束日期")
+@click.option(
+    "--periods", default="120,240,480,720,1440",
+    help="动量回看根数(1h)，逗号分隔，默认 5/10/20/30/60 日",
+)
+@click.option("--horizons", default="24,72,120", help="前瞻根数，逗号分隔")
+@click.option("--quantiles", default=5, help="因子分位层数")
+def momentum_eval(pair, start, end, periods, horizons, quantiles):
+    """评估动量因子预测力：分位分层前瞻收益 + IC，对比无条件基准"""
+    from analysis.momentum_eval import evaluate_momentum, format_eval
+
+    ps = [int(x) for x in periods.split(",") if x.strip()]
+    hs = [int(x) for x in horizons.split(",") if x.strip()]
+    click.echo(format_eval(evaluate_momentum(pair, start, end, ps, hs, quantiles)))
+
+
 @cli.command()
 def info():
     """显示当前配置信息"""
